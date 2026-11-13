@@ -622,15 +622,20 @@ function zoomTo(s,now){
   const el=s.canvas.parentNode;let sc=1,cx=.5,cy=.5;
   if(feat.zmove&&!s.drawing&&s.zbox&&now-s.zboxT<1800){const [x,y,w,h]=s.zbox;const k=Math.min(3,0.6/Math.max(w,h,0.05));if(k>=1.4){sc=k;cx=x+w/2;cy=y+h/2}}
   const a=sc===1?0.08:0.15;s.zsc+=(sc-s.zsc)*a;s.zx+=(cx-s.zx)*a;s.zy+=(cy-s.zy)*a;
-  if(Math.abs(s.zsc-1)<0.02&&sc===1){if(el.style.transform)el.style.transform='';return}
+  if(Math.abs(s.zsc-1)<0.02&&sc===1){if(el.style.transform)el.style.transform='';s.vis=[0,0,1];return}
   const L=Math.min(Math.max(s.zx-0.5/s.zsc,0),1-1/s.zsc),T=Math.min(Math.max(s.zy-0.5/s.zsc,0),1-1/s.zsc);
+  s.vis=[L,T,1/s.zsc];
   el.style.transform='scale('+s.zsc.toFixed(3)+') translate('+(-L*100).toFixed(2)+'%,'+(-T*100).toFixed(2)+'%)';
 }
 function draw(s,now){
   const v=s.video,c=s.canvas;if(!v.videoWidth)return;if(c.width!==v.videoWidth){c.width=v.videoWidth;c.height=v.videoHeight;s.tile.querySelector('.vw').style.aspectRatio=v.videoWidth+'/'+v.videoHeight}
   zoomTo(s,now);
   const g=c.getContext('2d');g.clearRect(0,0,c.width,c.height);const k=c.width/640;g.lineWidth=2*k;g.font=(14*k)+'px sans-serif';
-  const lab=(txt,x,y,col,fg)=>{const w=g.measureText(txt).width+8*k;g.fillStyle=col;g.fillRect(x,Math.max(0,y-18*k),w,18*k);g.fillStyle=fg||'#000';g.fillText(txt,x+4*k,Math.max(14*k,y-4*k))};
+  const vis=s.vis||[0,0,1];const vx0=vis[0]*c.width,vy0=vis[1]*c.height,vx1=vx0+vis[2]*c.width,vy1=vy0+vis[2]*c.height;const placed=[];const lh=18*k;
+  const lab=(txt,x,y,col,fg)=>{const w=g.measureText(txt).width+8*k;
+    x=Math.max(vx0,Math.min(x,vx1-w));let top=Math.max(vy0,Math.min(y-lh,vy1-lh));
+    for(let i=0;i<8&&placed.some(p=>x<p[0]+p[2]&&x+w>p[0]&&top<p[1]+lh&&top+lh>p[1]);i++){top+=lh;if(top>vy1-lh)top=vy0}
+    placed.push([x,top,w]);g.fillStyle=col;g.fillRect(x,top,w,lh);g.fillStyle=fg||'#000';g.fillText(txt,x+4*k,top+lh-4*k)};
   if(s.zone){const z=s.zone;g.fillStyle='rgba(255,92,108,.12)';g.fillRect(z[0]*c.width,z[1]*c.height,z[2]*c.width,z[3]*c.height);g.strokeStyle='#ff5c6c';g.setLineDash([]);g.strokeRect(z[0]*c.width,z[1]*c.height,z[2]*c.width,z[3]*c.height)}
   const wc=wantCls();
   for(const t of s.tracks){if(t.hits<2||now-t.last>Math.max(1000,(models.ms||0)*3))continue;
