@@ -27,7 +27,8 @@ input[type=text]{width:100%;background:var(--card2);border:1px solid var(--line)
 @media(min-width:700px){.grid.cams{grid-template-columns:1fr 1fr}.two{display:grid;grid-template-columns:1fr 1fr;gap:12px}}
 @media(min-width:1000px){.layout{display:grid;grid-template-columns:1.6fr 1fr;gap:12px;align-items:start}}
 .tile{background:#000;border:1px solid var(--line);border-radius:14px;overflow:hidden;position:relative}
-.tile .vw{position:relative;width:100%;background:#000;aspect-ratio:16/9}
+.tile .vw{position:relative;width:100%;background:#000;aspect-ratio:16/9;overflow:hidden}
+.zm{position:absolute;inset:0;transform-origin:0 0;will-change:transform}
 .tile video,.tile canvas{position:absolute;inset:0;width:100%;height:100%;object-fit:fill}
 .tile .cap{display:flex;justify-content:space-between;gap:8px;padding:8px 10px;background:var(--card);font-size:13px;flex-wrap:wrap}
 .tile .bar{height:5px;background:#223;}.tile .bar i{display:block;height:100%;background:var(--wa);width:0}
@@ -44,6 +45,7 @@ input[type=text]{width:100%;background:var(--card2);border:1px solid var(--line)
 label.sw{display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid var(--line);gap:10px}
 label.sw input{width:22px;height:22px;accent-color:var(--ac)}
 details>summary{cursor:pointer;font-weight:600;padding:6px 0}
+.grid.cams[data-n="1"]{grid-template-columns:1fr!important}
 .grid.cams[data-n="3"],.grid.cams[data-n="4"]{grid-template-columns:1fr 1fr;gap:8px}
 .grid.cams[data-n="3"] .cap,.grid.cams[data-n="4"] .cap{font-size:11px;padding:5px 6px}
 .grid.cams[data-n="3"] .btn.sm,.grid.cams[data-n="4"] .btn.sm{font-size:12px;padding:5px 8px;min-height:30px}
@@ -53,6 +55,13 @@ details>summary{cursor:pointer;font-weight:600;padding:6px 0}
 .tile.spot .vw{cursor:zoom-out}
 #backdrop{position:fixed;inset:0;background:rgba(0,0,0,.72);z-index:50}
 .camview{position:relative;border-radius:14px;overflow:hidden;background:#000}.camview video{width:100%;display:block;max-height:60vh;object-fit:cover}
+.legend i{display:inline-block;width:12px;height:12px;border:3px solid #ff2d2d;border-radius:3px;vertical-align:-2px;margin-right:4px}
+.refrow{display:flex;gap:10px;align-items:center;padding:8px 0;border-bottom:1px solid var(--line);flex-wrap:wrap}
+.refrow .th{display:flex;gap:4px}.refrow .th img{width:42px;height:42px;object-fit:cover;border-radius:6px;border:1px solid var(--line)}
+.refrow .nm{flex:1;min-width:140px}
+input.plain{text-transform:none;letter-spacing:0;font-size:16px}
+.diag{font:12px/1.4 ui-monospace,Menlo,monospace;color:var(--mu);word-break:break-word}
+select{background:var(--card2);color:var(--tx);border:1px solid var(--line);border-radius:10px;padding:8px;font-size:15px}
 </style>
 </head>
 <body>
@@ -73,10 +82,10 @@ details>summary{cursor:pointer;font-weight:600;padding:6px 0}
       <button class="btn sec" id="bJoin">Beitreten</button>
     </details>
   </div>
-  <div class="note" id="fileWarn" class="hide">Diese Seite läuft nicht über https. Kamera und QR-Kopplung funktionieren nur auf der gehosteten Seite (https) oder auf localhost.</div>
+  <div class="note" id="fileWarn">Diese Seite läuft nicht über https. Kamera und QR-Kopplung funktionieren nur auf der gehosteten Seite (https) oder auf localhost.</div>
   <div class="card sm mu">
     <b style="color:var(--tx)">Ehrlich vorab</b><br>
-    Alles, was die KI meldet, sind Schätzungen. Personen und Autos werden mit einem kleinen Standardmodell erkannt (Fehler möglich, besonders bei Dunkelheit). Die Geschwindigkeit ist nur grob geschätzt. Wiederkehrende Gesichter bekommen anonyme Namen wie "Person 1". Die Seite sagt nicht, wer jemand ist. Nur auf eigenem Grundstück und mit Wissen der gefilmten Personen verwenden.
+    Alles, was die KI meldet, sind Schätzungen. Personen und Autos werden mit einem kleinen Standardmodell erkannt (Fehler möglich, besonders bei Dunkelheit). Die Geschwindigkeit ist nur grob geschätzt. Wiederkehrende Gesichter bekommen anonyme Namen wie "Person 1". Die Seite nennt nur dann einen Namen, wenn du selbst Referenzfotos hochlädst, und sagt dann "sicher" oder "unsicher". Gesichter ändern sich mit den Jahren, ein Treffer ist nie ein Beweis. Nur auf eigenem Grundstück und mit Wissen der gefilmten Personen verwenden.
   </div>
 </section>
 
@@ -88,6 +97,8 @@ details>summary{cursor:pointer;font-weight:600;padding:6px 0}
   <div class="card" style="margin-top:12px">
     <button class="btn" id="camStart">Kamera starten und verbinden</button>
     <div class="row"><button class="btn sec sm" id="camFlip">Kamera wechseln</button><button class="btn bad sm" id="camStop">Beenden</button></div>
+    <button class="btn hide" id="camRetry">Erneut verbinden</button>
+    <div class="diag" id="camDiag"></div>
     <p class="sm mu" id="camMsg">Tippe auf Start, erlaube die Kamera. Danach das Gerät hinstellen und Bildschirm anlassen.</p>
   </div>
 </section>
@@ -95,6 +106,7 @@ details>summary{cursor:pointer;font-weight:600;padding:6px 0}
 <!-- CONTROL -->
 <section id="control" class="hide">
   <div class="row" style="justify-content:space-between"><h1 id="ctrlTitle">Kontrollgerät</h1><div class="row"><span class="pill" id="aiStatus">KI: aus</span><span class="pill" id="netStatus"></span></div></div>
+  <div class="diag" id="ctrlDiag" style="margin:4px 0 8px"></div>
   <div class="layout">
     <div>
       <div class="grid cams" id="camGrid"></div>
@@ -107,7 +119,7 @@ details>summary{cursor:pointer;font-weight:600;padding:6px 0}
         <div class="code" id="codeTxt"></div>
         <div class="sm mu" style="text-align:center">Auf dem Kameragerät: QR mit der Kamera-App scannen und den Link öffnen. Oder die Seite öffnen, "Beitreten" und diesen Code eingeben.</div>
         <div class="sm mu" id="linkTxt" style="word-break:break-all;margin-top:6px"></div>
-        <div class="row" style="margin-top:8px"><button class="btn sec sm" id="copyLink">Link kopieren</button><button class="btn sec sm" id="localCam">Kamera dieses Geräts hinzufügen</button></div>
+        <div class="row" style="margin-top:8px"><button class="btn sec sm" id="copyLink">Link kopieren</button><button class="btn sec sm" id="ctrlRetry">Neu verbinden</button><button class="btn sec sm" id="localCam">Kamera dieses Geräts hinzufügen</button></div>
       </div>
       <div class="card"><h2>Zähler (alle Kameras)</h2>
         <div class="stats">
@@ -121,6 +133,22 @@ details>summary{cursor:pointer;font-weight:600;padding:6px 0}
       </div>
     </div>
   </div>
+  <div class="card" id="refCard"><h2>Gesucht: Referenzfotos hochladen</h2>
+    <div class="sm mu">Lade Fotos einer Person hoch. Sobald sie in einer Kamera erkannt wird, wird sie <b style="color:#ff2d2d">rot markiert</b>, mit Alarm und Bild im Ereignisprotokoll. Die Fotos bleiben auf diesem Gerät (nichts wird hochgeladen, nur gespeichert im Browser).</div>
+    <div class="note">Mehrere Fotos pro Person verbessern die Trefferquote am meisten: verschiedene Jahre, mit und ohne Brille oder Bart, Gesicht groß und von vorn. Ein 5 Jahre altes Foto kann funktionieren, muss aber nicht. Die Seite meldet deshalb <b>sicher</b> oder <b>unsicher</b>, statt zu raten.</div>
+    <div class="row"><input type="text" class="plain" id="refName" placeholder="Name der gesuchten Person" style="flex:1;min-width:160px">
+      <button class="btn sm" id="refAdd">Fotos wählen</button></div>
+    <input type="file" id="refFile" accept="image/*" multiple class="hide">
+    <div class="sm mu" id="refMsg" style="margin:6px 0"></div>
+    <div id="refList"></div>
+    <label class="sw"><span>Treffer-Strenge</span><select id="refStrict"><option value="loose">locker (mehr Treffer, mehr Fehler)</option><option value="normal" selected>normal</option><option value="strict">streng (weniger Fehler)</option></select></label>
+    <details style="margin-top:6px"><summary>Gegenstand, Tier oder Fahrzeug suchen (stark eingeschränkt)</summary>
+      <div class="note">Das geht nur grob: die Seite erkennt in deinem Foto nur die <b>Klasse</b> (z. B. Hund, Rucksack, Auto) und markiert dann <b>jedes</b> Ding dieser Klasse rot. Sie kann <b>nicht</b> prüfen, ob es genau dein Exemplar ist.</div>
+      <button class="btn sec sm" id="objAdd">Foto von Gegenstand wählen</button>
+      <input type="file" id="objFile" accept="image/*" class="hide">
+    </details>
+    <button class="btn bad sm" id="refWipe" style="margin-top:8px">Alle Referenzen löschen</button>
+  </div>
   <div class="two">
     <div class="card"><h2>Ereignisse</h2><div class="log" id="log"><div class="mu">Noch nichts erkannt.</div></div></div>
     <div class="card"><h2>Wiederkehrende Gesichter (anonym)</h2><div class="faces" id="faces"><span class="mu sm">Noch keine.</span></div>
@@ -129,6 +157,9 @@ details>summary{cursor:pointer;font-weight:600;padding:6px 0}
   <div class="card"><h2>Einstellungen</h2>
     <label class="sw"><span>Bewegung erkennen</span><input type="checkbox" id="fMotion" checked></label>
     <label class="sw" style="display:block"><span>Bewegungs-Empfindlichkeit: <b id="sensVal">8</b>/10 (10 = extrem)</span><input type="range" id="sens" min="1" max="10" value="8" style="width:100%;height:30px"></label>
+    <label class="sw"><span>Bewegung rot markieren und hineinzoomen</span><input type="checkbox" id="fZmove" checked></label>
+    <label class="sw"><span>Objekt-Erkennung</span><select id="fModel"><option value="mobilenet_v2">genauer (langsamer)</option><option value="lite_mobilenet_v2">schneller (ungenauer)</option></select></label>
+    <div class="sm mu legend" style="margin:6px 0"><i></i>Rot = Bewegung, oder eine gesuchte Person / ein gesuchtes Ding aus deinen Referenzfotos. Blau = Person, grün = Fahrzeug, gelb = Tier, pink = anonymes Gesicht.</div>
     <label class="sw"><span>Bei Alarm: Kamera groß in die Mitte (6 s)</span><input type="checkbox" id="fZoom" checked></label>
     <label class="sw"><span>Alarmton und Vibration</span><input type="checkbox" id="fSound"></label>
     <label class="sw"><span>Herumlungern: Alarm nach (Sekunden)</span><input type="text" id="loiter" value="20" style="width:90px;font-size:16px;letter-spacing:0;text-transform:none"></label>
@@ -158,7 +189,17 @@ const show=id=>{['home','camera','control'].forEach(x=>$(x).classList.toggle('hi
 const fmtT=t=>new Date(t).toLocaleTimeString('de-DE');
 const secure=window.isSecureContext;
 if(secure)$('fileWarn').classList.add('hide');
-const PEER_OPTS={debug:0}; // PeerJS Cloud (0.peerjs.com) nur fuer den Verbindungsaufbau, Video laeuft per WebRTC direkt
+const RELAY=/relay=1/.test(location.hash);
+const ICE=[{urls:'stun:stun.l.google.com:19302'},{urls:'stun:global.stun.twilio.com:3478'},
+ {urls:['turn:eu-0.turn.peerjs.com:3478','turn:us-0.turn.peerjs.com:3478'],username:'peerjs',credential:'peerjsp'},
+ {urls:['turn:openrelay.metered.ca:80','turn:openrelay.metered.ca:443','turns:openrelay.metered.ca:443?transport=tcp'],username:'openrelayproject',credential:'openrelayproject'}];
+const PEER_OPTS={debug:0,config:{iceServers:ICE,iceTransportPolicy:RELAY?'relay':'all'}};
+const candTxt=c=>Object.keys(c).length?Object.entries(c).map(([k,v])=>k+':'+v).join(' '):'keine';
+function watchPc(pc,store,cb){
+  pc.addEventListener('icecandidate',e=>{if(e.candidate){const t=e.candidate.type||((e.candidate.candidate||'').match(/typ (\w+)/)||[])[1]||'?';store[t]=(store[t]||0)+1;cb()}});
+  ['iceconnectionstatechange','signalingstatechange','icegatheringstatechange'].forEach(ev=>pc.addEventListener(ev,cb));
+}
+// // PeerJS Cloud (0.peerjs.com) nur fuer den Verbindungsaufbau, Video laeuft per WebRTC direkt
 const ID_PREFIX='sw-';
 const rid=()=>Array.from({length:6},()=>'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'[Math.floor(Math.random()*32)]).join('');
 
@@ -172,40 +213,70 @@ async function startCameraDevice(code){
   camTarget=ID_PREFIX+code.toUpperCase().trim();
   show('camera');
   $('camLink').textContent='Code '+code.toUpperCase();
-  $('camStart').onclick=connectCam;
+  $('camStart').onclick=connectCam;$('camRetry').onclick=()=>{$('camStart').disabled=true;camTries=0;connectCam()};
   $('camFlip').onclick=async()=>{camFacing=camFacing==='environment'?'user':'environment';if(!camStream)return;try{const ns=await getCam();const nt=ns.getVideoTracks()[0];if(camCall&&camCall.peerConnection){const s=camCall.peerConnection.getSenders().find(x=>x.track&&x.track.kind==='video');if(s)await s.replaceTrack(nt)}camStream.getTracks().forEach(t=>t.stop());camStream=ns;$('camVideo').srcObject=ns}catch(e){$('camMsg').textContent='Wechsel nicht möglich: '+e.message}};
   $('camStop').onclick=()=>{stopCam();location.hash='';location.reload()};
   if(!secure){setCamStatus('Kein https','err');$('camMsg').textContent='Kamera geht nur über https. Bitte die gehostete Seite verwenden.'}
 }
+let camGen=0,camTries=0,camTimer=null,camName=null;
 async function connectCam(){
-  $('camStart').disabled=true;setCamStatus('Kamera wird gestartet...','warn');
-  try{camStream=await getCam()}catch(e){setCamStatus('Keine Kamera','err');$('camMsg').textContent='Kamerazugriff nicht möglich ('+(e.name||e.message)+'). Erlaube die Kamera in den Browser-Einstellungen und tippe erneut.';$('camStart').disabled=false;return}
-  $('camVideo').srcObject=camStream;
+  $('camStart').disabled=true;$('camRetry').classList.add('hide');
+  if(!camStream){
+    setCamStatus('Kamera wird gestartet...','warn');
+    try{camStream=await getCam()}catch(e){setCamStatus('Keine Kamera','err');$('camMsg').textContent='Kamerazugriff nicht möglich ('+(e.name||e.message)+'). Erlaube die Kamera in den Browser-Einstellungen (Safari: Aa-Symbol, Website-Einstellungen) und tippe erneut.';$('camStart').disabled=false;$('camRetry').classList.remove('hide');return}
+    $('camVideo').srcObject=camStream;
+  }
   try{wake=await navigator.wakeLock.request('screen')}catch(e){}
-  setCamStatus('Verbinde...','warn');
-  camPeer=new Peer(PEER_OPTS);
-  camPeer.on('error',e=>{
-    if(e.type==='peer-unavailable'){setCamStatus('Kontrollgerät nicht gefunden','err');$('camMsg').textContent='Das Kontrollgerät mit diesem Code ist nicht online. Dort die Seite offen lassen, Code prüfen und erneut tippen.';$('camStart').disabled=false}
-    else{setCamStatus('Fehler: '+e.type,'err');$('camMsg').textContent='Verbindung zum Vermittlungsserver fehlgeschlagen ('+e.type+'). Internet prüfen.';$('camStart').disabled=false}
-  });
-  camPeer.on('open',()=>{
-    const name='Kamera '+(camPeer.id||'').slice(-3).toUpperCase();
-    camCall=camPeer.call(camTarget,camStream,{metadata:{name}});
-    if(!camCall){setCamStatus('Fehler','err');return}
-    camCall.on('close',()=>{setCamStatus('Getrennt (oder schon 4 Kameras verbunden)','err')});
-    camCall.on('error',e=>{setCamStatus('Fehler','err');$('camMsg').textContent=String(e)});
-    const pc=camCall.peerConnection;
-    const upd=()=>{const s=pc.iceConnectionState;if(s==='connected'||s==='completed'){setCamStatus('Verbunden, sendet Video','ok');$('camMsg').textContent='Läuft. Gerät hinstellen, Bildschirm anlassen.'}else if(s==='failed'){setCamStatus('Verbindung fehlgeschlagen','err');$('camMsg').textContent='Direkte Verbindung nicht möglich (Netzwerk blockiert?). Beide Geräte ins selbe WLAN und erneut versuchen.'}else if(s==='disconnected'){setCamStatus('Unterbrochen...','warn')}else setCamStatus('Verbinde...','warn')};
-    pc.addEventListener('iceconnectionstatechange',upd);upd();
-    setTimeout(()=>{const s=pc.iceConnectionState;if(s!=='connected'&&s!=='completed'){setCamStatus('Kontrollgerät antwortet nicht','err');$('camMsg').textContent='Keine Antwort. Ist die Kontrollseite offen? Zur Not im selben WLAN erneut versuchen.';$('camStart').disabled=false}},20000);
-  });
-  camPeer.on('disconnected',()=>{try{camPeer.reconnect()}catch(e){}});
+  camTries=0;dial();
 }
+function dial(){
+  const my=++camGen;camTries++;clearTimeout(camTimer);
+  try{camCall&&camCall.close()}catch(e){}try{camPeer&&camPeer.destroy()}catch(e){}
+  const cands={};let broker='verbinde',sig='-',ice='-';
+  const diag=()=>{$('camDiag').textContent='Versuch '+camTries+'/3 | Server: '+broker+' | Antwort vom Kontrollgerät: '+sig+' | Verbindung: '+ice+' | Kandidaten: '+candTxt(cands)+(RELAY?' | NUR RELAY':'')};
+  const fail=(st,msg)=>{if(my!==camGen)return;clearTimeout(camTimer);setCamStatus(st,'err');$('camMsg').textContent=msg;$('camStart').disabled=false;$('camRetry').classList.remove('hide');diag()};
+  const retry=why=>{if(camTries>=3)return false;$('camMsg').textContent=why+' Neuer Versuch in 3 Sekunden ...';setCamStatus('Neuer Versuch ...','warn');camTimer=setTimeout(()=>{if(my===camGen)dial()},3000);return true};
+  setCamStatus('Verbinde ('+camTries+'/3) ...','warn');$('camMsg').textContent='Verbindung wird aufgebaut ...';diag();
+  camPeer=new Peer(PEER_OPTS);
+  camPeer.on('error',e=>{if(my!==camGen)return;
+    if(e.type==='peer-unavailable'){broker='ok';sig='Code nicht gefunden';diag();if(!retry('Das Kontrollgerät mit diesem Code ist nicht online.'))fail('Kontrollgerät nicht gefunden','Das Kontrollgerät mit diesem Code ist nicht online. Dort die Seite offen lassen und den Bildschirm anlassen (iPad nicht sperren), Code prüfen, dann "Erneut verbinden".')}
+    else{broker='Fehler '+e.type;diag();if(!retry('Vermittlungsserver nicht erreichbar ('+e.type+').'))fail('Server nicht erreichbar','Der kostenlose Vermittlungsserver (0.peerjs.com) ist nicht erreichbar ('+e.type+'). Internet prüfen, dann "Erneut verbinden".')}});
+  camPeer.on('disconnected',()=>{if(my!==camGen)return;broker='getrennt';diag();try{camPeer.reconnect()}catch(e){}});
+  camPeer.on('open',()=>{
+    if(my!==camGen)return;broker='ok';diag();
+    if(!camName)camName='Kamera '+camPeer.id.slice(-3).toUpperCase();
+    camCall=camPeer.call(camTarget,camStream,{metadata:{name:camName}});
+    if(!camCall){fail('Fehler','Anruf konnte nicht gestartet werden.');return}
+    const pc=camCall.peerConnection;
+    const upd=()=>{if(my!==camGen)return;ice=pc.iceConnectionState;sig=pc.signalingState==='stable'?'ja':'noch nicht';diag();
+      if(ice==='connected'||ice==='completed'){clearTimeout(camTimer);setCamStatus('Verbunden, sendet Video','ok');$('camMsg').textContent='Läuft. Gerät hinstellen, Bildschirm anlassen.';$('camRetry').classList.add('hide');$('camStart').disabled=true}
+      else if(ice==='failed'){clearTimeout(camTimer);if(!retry('Direkte Verbindung fehlgeschlagen.'))fail('Verbindung fehlgeschlagen','Die Geräte finden keinen Weg zueinander. Tipp: beide Geräte ins selbe WLAN oder auf einem Gerät das Mobilnetz ausschalten, dann "Erneut verbinden".')}
+      else if(ice==='disconnected')setCamStatus('Unterbrochen ...','warn');
+      else setCamStatus('Verbinde ('+camTries+'/3) ...','warn')};
+    watchPc(pc,cands,upd);upd();
+    camCall.on('close',()=>{if(my!==camGen)return;setCamStatus('Getrennt (oder schon 4 Kameras verbunden)','err');$('camStart').disabled=false;$('camRetry').classList.remove('hide')});
+    camCall.on('error',e=>{if(my!==camGen)return;fail('Fehler',String(e))});
+    camTimer=setTimeout(()=>{
+      if(my!==camGen)return;const st=pc.iceConnectionState;if(st==='connected'||st==='completed')return;
+      let why;
+      if(pc.signalingState!=='stable')why='Das Kontrollgerät hat nicht geantwortet (ist die Seite dort offen und der Bildschirm an?).';
+      else if(!cands.srflx&&!cands.relay)why='Dein Netz lässt keine STUN/TURN-Verbindung zu (nur lokale Adressen gefunden).';
+      else why='Die beiden Geräte finden keinen Weg zueinander.';
+      if(!retry(why))fail('Keine Verbindung',why+' Tipp: beide Geräte ins selbe WLAN, dann "Erneut verbinden".');
+    },25000);
+  });
+}
+document.addEventListener('visibilitychange',()=>{
+  if(document.visibilityState!=='visible')return;
+  if(camStream&&!$('camera').classList.contains('hide')){try{navigator.wakeLock.request('screen').then(w=>wake=w).catch(()=>{})}catch(e){}
+    const st=camCall&&camCall.peerConnection&&camCall.peerConnection.iceConnectionState;if(camPeer&&st!=='connected'&&st!=='completed'){camTries=0;dial()}}
+  if(ctrlPeer)ctrlWatch();
+});
 function stopCam(){try{camCall&&camCall.close()}catch(e){}try{camPeer&&camPeer.destroy()}catch(e){}if(camStream)camStream.getTracks().forEach(t=>t.stop());try{wake&&wake.release()}catch(e){}}
 
 /* ===================== CONTROL DEVICE ===================== */
 const MAXCAM=4;const sources=new Map();let ctrlPeer=null,ctrlId=null,srcCount=0,analysisStarted=false;
-const feat={motion:true,obj:true,face:true,animal:true,sound:false,zoom:true,sens:8};
+const feat={zmove:true,motion:true,obj:true,face:true,animal:true,sound:false,zoom:true,sens:8};
 const stats={persTot:0,cars:0,animals:0,lastSpeed:null};
 const logs=[];
 const gallery=[];let faceN=0;
@@ -218,46 +289,73 @@ function startControl(single){
   show('control');
   $('ctrlTitle').textContent=single?'Einzelgerät':'Kontrollgerät';
   $('pairCard').classList.toggle('hide',!!single);
+  isSingle=!!single;
+  if(!single)ctrlWakeLock();
   if(single){$('techInfo').textContent='Einzelgerät-Modus: nichts wird übertragen, das Video bleibt auf diesem Gerät.';addLocalCam();startAnalysis();return}
   let code=sessionStorage.getItem('sw_code')||rid();sessionStorage.setItem('sw_code',code);
   openCtrlPeer(code);
   startAnalysis();
   updateEmpty();
 }
+let ctrlCode=null,isSingle=false,ctrlWake=null,brokerTxt='-';
+async function ctrlWakeLock(){try{ctrlWake=await navigator.wakeLock.request('screen')}catch(e){ctrlWake=null}}
+function ctrlWatch(){
+  if(isSingle||!ctrlPeer||!ctrlCode||$('control').classList.contains('hide'))return;
+  if(!ctrlWake||ctrlWake.released)ctrlWakeLock();
+  if(ctrlPeer.destroyed){openCtrlPeer(ctrlCode)}
+  else if(ctrlPeer.disconnected){setNet('Getrennt, verbinde neu...','warn');try{ctrlPeer.reconnect()}catch(e){}}
+}
+setInterval(ctrlWatch,5000);
+setInterval(()=>{
+  if($('control').classList.contains('hide')||isSingle)return;
+  const parts=['Vermittlungsserver: '+brokerTxt,'Bildschirm-Sperre verhindert: '+(ctrlWake&&!ctrlWake.released?'ja':'nein (Display nicht ausschalten lassen)')];
+  sources.forEach(s=>{if(s.kind==='remote'){const pc=s.call&&s.call.peerConnection;parts.push(s.name+': '+(pc?pc.iceConnectionState:'-')+' ['+candTxt(s.cands||{})+']')}});
+  parts.push('Objekt-Analyse: '+(models.ms?Math.round(models.ms)+' ms/Bild':'-'));$('ctrlDiag').textContent=parts.join(' | ')+(RELAY?' | NUR RELAY':'');
+},1500);
 function openCtrlPeer(code){
-  ctrlId=ID_PREFIX+code;setNet('Verbinde...','warn');
-  ctrlPeer=new Peer(ctrlId,PEER_OPTS);
-  ctrlPeer.on('open',()=>{
-    setNet('Bereit für Kameras','ok');
+  ctrlId=ID_PREFIX+code;ctrlCode=code;setNet('Verbinde...','warn');brokerTxt='verbinde';
+  try{ctrlPeer&&!ctrlPeer.destroyed&&ctrlPeer.destroy()}catch(e){}
+  const me=ctrlPeer=new Peer(ctrlId,PEER_OPTS);
+  me.on('open',()=>{
+    brokerTxt='verbunden';setNet('Bereit für Kameras','ok');
     const base=location.href.split('#')[0];
     const url=base+'#join='+code;
     $('codeTxt').textContent=code;$('linkTxt').textContent=url;
     try{const q=qrcode(0,'M');q.addData(url);q.make();$('qr').innerHTML=q.createSvgTag({cellSize:4,margin:0,scalable:true})}catch(e){$('qr').textContent='QR-Fehler'}
     $('copyLink').onclick=()=>{navigator.clipboard&&navigator.clipboard.writeText(url).then(()=>{$('copyLink').textContent='Kopiert'}).catch(()=>{})};
-    $('techInfo').textContent='Verbindung: WebRTC direkt zwischen den Geräten. Vermittlung beim Aufbau: öffentlicher PeerJS-Cloud-Server (0.peerjs.com), STUN: Google (stun.l.google.com). Kein eigener Server, kein Konto.';
+    $('techInfo').textContent='Verbindung: WebRTC direkt zwischen den Geräten. Vermittlung beim Aufbau: öffentlicher PeerJS-Cloud-Server (0.peerjs.com). STUN: Google und Twilio. Falls kein direkter Weg geht, Relay über kostenlose öffentliche TURN-Server (PeerJS, Open Relay von Metered). Kein eigener Server, kein Konto. Wichtig: dieses Gerät muss die Seite offen und den Bildschirm an lassen.';
   });
-  ctrlPeer.on('call',call=>{
-    if(!sources.has(call.peer)&&[...sources.values()].filter(x=>x.kind==='remote').length+(sources.has('local')?1:0)>=MAXCAM){call.close();addLog(null,'info','Kamera abgelehnt: schon '+MAXCAM+' Kameras verbunden');return}
+  me.on('call',call=>{
+    const nm=call.metadata&&call.metadata.name;
+    if(nm)[...sources.values()].forEach(x=>{if(x.kind==='remote'&&x.name===nm&&x.id!==call.peer)dropSource(x.id,true)});
+    if(!sources.has(call.peer)&&sources.size>=MAXCAM){call.close();addLog(null,'info','Kamera abgelehnt: schon '+MAXCAM+' Kameras verbunden');return}
     call.answer();
+    let s=sources.get(call.peer);if(!s){s=makeTile(call.peer,nm||('Kamera '+(++srcCount)),'remote')}
+    s.call=call;s.cands={};s.status.textContent='Kamera verbindet ...';
     call.on('stream',stream=>addRemote(call,stream));
     call.on('close',()=>dropSource(call.peer));
     call.on('error',()=>dropSource(call.peer));
     const pc=call.peerConnection;
-    if(pc)pc.addEventListener('iceconnectionstatechange',()=>{const s=pc.iceConnectionState;const src=sources.get(call.peer);if(!src)return;if(s==='disconnected'||s==='failed'||s==='closed'){src.status.textContent='getrennt';setTimeout(()=>{if(pc.iceConnectionState!=='connected'&&pc.iceConnectionState!=='completed')dropSource(call.peer)},8000)}else if(s==='connected'||s==='completed'){src.status.textContent='live'}});
+    if(pc)watchPc(pc,s.cands,()=>{const st=pc.iceConnectionState;if(!sources.has(call.peer))return;
+      if(st==='disconnected'||st==='failed'||st==='closed'){s.status.textContent='getrennt';setTimeout(()=>{if(pc.iceConnectionState!=='connected'&&pc.iceConnectionState!=='completed')dropSource(call.peer)},8000)}
+      else if(st==='connected'||st==='completed'){if(s.logged)s.status.textContent='live'}
+      else s.status.textContent='Kamera verbindet ('+st+') ...'});
+    setTimeout(()=>{const x=sources.get(call.peer);if(x&&!x.logged){addLog(null,'info','Kamera '+x.name+' hat sich nicht fertig verbunden (ICE '+(pc?pc.iceConnectionState:'-')+')');dropSource(call.peer,true)}},30000);
   });
-  ctrlPeer.on('error',e=>{
-    if(e.type==='unavailable-id'){sessionStorage.removeItem('sw_code');const c=rid();sessionStorage.setItem('sw_code',c);openCtrlPeer(c)}
-    else setNet('Netzfehler: '+e.type,'err');
+  me.on('error',e=>{
+    if(me!==ctrlPeer)return;
+    if(e.type==='unavailable-id'){setTimeout(()=>{if(me===ctrlPeer)openCtrlPeer(code)},2500)}
+    else{brokerTxt='Fehler '+e.type;setNet('Netzfehler: '+e.type+' (versuche erneut)','err')}
   });
-  ctrlPeer.on('disconnected',()=>{setNet('Getrennt, verbinde neu...','warn');try{ctrlPeer.reconnect()}catch(e){}});
+  me.on('disconnected',()=>{if(me!==ctrlPeer)return;brokerTxt='getrennt';setNet('Getrennt, verbinde neu...','warn');try{me.reconnect()}catch(e){}});
 }
 function makeTile(id,name,kind){
   const t=document.createElement('div');t.className='tile';
-  t.innerHTML='<div class="vw"><video autoplay playsinline muted></video><canvas></canvas></div><div class="bar"><i></i></div><div class="cap"><b></b><span class="st"></span><span class="info mu"></span></div><div class="cap" style="padding-top:0"><button class="btn sec sm zbtn">Zone zeichnen</button><button class="btn sec sm zclr hide">Zone löschen</button><span class="mu zhint"></span></div>';
+  t.innerHTML='<div class="vw"><div class="zm"><video autoplay playsinline muted></video><canvas></canvas></div></div><div class="bar"><i></i></div><div class="cap"><b></b><span class="st"></span><span class="info mu"></span></div><div class="cap" style="padding-top:0"><button class="btn sec sm zbtn">Zone zeichnen</button><button class="btn sec sm zclr hide">Zone löschen</button><span class="mu zhint"></span></div>';
   t.querySelector('b').textContent=name;
   const slot=document.createElement('div');slot.className='slot';slot.appendChild(t);$('camGrid').appendChild(slot);
   const s={id,name,kind,tile:t,video:t.querySelector('video'),canvas:t.querySelector('canvas'),bar:t.querySelector('.bar i'),status:t.querySelector('.st'),info:t.querySelector('.info'),
-    slot,tracks:[],nextId:1,prev:null,lastMotion:0,motionPct:0,motionBox:null,lastFace:0,faces:[],persNow:0,mc:document.createElement('canvas'),lastObj:0,ended:[]};
+    slot,tracks:[],nextId:1,prev:null,lastMotion:0,motionPct:0,motionBox:null,lastFace:0,faces:[],persNow:0,mc:document.createElement('canvas'),lastObj:0,ended:[],zsc:1,zx:.5,zy:.5};
   s.mc.width=64;s.mc.height=48;s.status.textContent='verbinde';s.zone=null;s.drawing=false;
   const zb=t.querySelector('.zbtn'),zc=t.querySelector('.zclr'),zh=t.querySelector('.zhint'),cv=s.canvas;
   zb.onclick=()=>{s.drawing=!s.drawing;zb.textContent=s.drawing?'Abbrechen':'Zone zeichnen';zh.textContent=s.drawing?'Mit dem Finger ein Rechteck ins Bild ziehen':'';cv.style.touchAction=s.drawing?'none':'';cv.style.pointerEvents=s.drawing?'auto':'none'};
@@ -271,11 +369,11 @@ function makeTile(id,name,kind){
   sources.set(id,s);updateEmpty();return s;
 }
 function addRemote(call,stream){
-  if(sources.has(call.peer)){const s=sources.get(call.peer);if(s.video.srcObject!==stream){s.video.srcObject=stream}return}
-  const name=(call.metadata&&call.metadata.name)||('Kamera '+(++srcCount));
-  const s=makeTile(call.peer,name,'remote');s.call=call;
-  s.video.srcObject=stream;s.video.play().catch(()=>{});s.status.textContent='live';
-  addLog(s,'info','Kamera verbunden: '+name);
+  let s=sources.get(call.peer);
+  if(!s){s=makeTile(call.peer,(call.metadata&&call.metadata.name)||('Kamera '+(++srcCount)),'remote');s.call=call}
+  if(s.video.srcObject!==stream)s.video.srcObject=stream;
+  s.video.play().catch(()=>{});s.status.textContent='live';
+  if(!s.logged){s.logged=true;addLog(s,'info','Kamera verbunden: '+s.name)}
 }
 async function addLocalCam(){
   if(sources.has('local'))return;
@@ -286,9 +384,9 @@ async function addLocalCam(){
     addLog(s,'info','Lokale Kamera gestartet');
   }catch(e){alert('Kamera nicht verfügbar: '+(e.name||e.message)+(secure?'':'\n(Seite nicht über https)'))}
 }
-function dropSource(id){
+function dropSource(id,quiet){
   const s=sources.get(id);if(!s)return;
-  addLog(s,'info','Kamera getrennt: '+s.name);
+  if(s.logged&&!quiet)addLog(s,'info','Kamera getrennt: '+s.name);
   if(s.stream)s.stream.getTracks().forEach(t=>t.stop());
   if(spotSrc===s)unspot();s.slot.remove();sources.delete(id);updateEmpty();
 }
@@ -310,7 +408,7 @@ function snap(s,box,pad){
     g.drawImage(v,Math.max(0,cx-sz/2),Math.max(0,cy-sz/2),sz,sz,0,0,96,96);return c.toDataURL('image/jpeg',.6)}catch(e){return null}
 }
 function addLog(s,kind,text,img){
-  if(s&&(kind==='motion'||kind==='zone'||kind==='loiter'))alarmSpot(s);
+  if(s&&(kind==='motion'||kind==='zone'||kind==='loiter'||kind==='wanted'))alarmSpot(s);
   logs.unshift({t:Date.now(),cam:s?s.name:'',kind,text,img});if(logs.length>80)logs.pop();renderLog();
 }
 let actx=null,lastBeep=0;
@@ -329,7 +427,8 @@ async function loadModels(){
   try{
     try{await tf.setBackend('webgl')}catch(e){await tf.setBackend('cpu')}await tf.ready();
     const tasks=[];
-    tasks.push(cocoSsd.load({base:'lite_mobilenet_v2'}).then(m=>{models.coco=m}));
+    models.base=localStorage.getItem('sw_model')||(tf.getBackend()==='webgl'?'mobilenet_v2':'lite_mobilenet_v2');$('fModel').value=models.base;
+    tasks.push(cocoSsd.load({base:models.base}).then(m=>{models.coco=m}));
     const MU='https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.13/model/';
     tasks.push(Promise.all([faceapi.nets.tinyFaceDetector.loadFromUri(MU),faceapi.nets.faceLandmark68TinyNet.loadFromUri(MU),faceapi.nets.faceRecognitionNet.loadFromUri(MU)]).then(()=>{models.face=true}));
     await Promise.all(tasks.map(p=>p.catch(e=>{console.warn(e)})));
@@ -338,7 +437,9 @@ async function loadModels(){
     else setAI('an ('+tf.getBackend()+(models.coco?'':', ohne Objekte')+(models.face?'':', ohne Gesichter')+')','ok');
   }catch(e){models.state='fehler';setAI('Fehler: '+(e.message||e),'err');console.error(e)}
 }
-function startAnalysis(){if(analysisStarted)return;analysisStarted=true;loadModels();loop()}
+setInterval(()=>{sources.forEach(s=>{try{if(!s.video.videoWidth)return;if(feat.motion)motion(s,Date.now());else{s.motionBox=null;s.motionPct=0;s.bar.style.width='0'}}catch(e){}})},250);
+function rafDraw(){const n=Date.now();sources.forEach(s=>{try{draw(s,n)}catch(e){window.__drawErr=window.__drawErr||String(e.stack||e)}});requestAnimationFrame(rafDraw)}
+function startAnalysis(){if(analysisStarted)return;analysisStarted=true;loadModels();loop();rafDraw()}
 
 /* ---------- analysis ---------- */
 const VEH={car:'Auto',truck:'Lkw',bus:'Bus',motorcycle:'Motorrad'};
@@ -350,15 +451,18 @@ function motion(s,now){
   const d=g.getImageData(0,0,64,48).data;const cur=new Uint8Array(64*48);
   const k=feat.sens;const pt=Math.round(40-k*3.2);        /* Pixel-Schwelle 37..8 */
   const areaMin=Math.max(0.15,3.2-k*0.3);                  /* Mindestflaeche in % */
-  const z=s.zone;let ch=0,tot=0,x0=64,y0=48,x1=0,y1=0;
+  const z=s.zone;let ch=0,tot=0,x0=64,y0=48,x1=0,y1=0;const cm=new Uint8Array(64*48);
   for(let i=0;i<cur.length;i++){const l=(d[i*4]*77+d[i*4+1]*150+d[i*4+2]*29)>>8;cur[i]=l;
     const x=i%64,y=(i/64)|0;if(z&&!(x/64>=z[0]&&x/64<=z[0]+z[2]&&y/48>=z[1]&&y/48<=z[1]+z[3]))continue;tot++;
-    if(s.prev&&Math.abs(l-s.prev[i])>pt){ch++;if(x<x0)x0=x;if(x>x1)x1=x;if(y<y0)y0=y;if(y>y1)y1=y}}
+    if(s.prev&&Math.abs(l-s.prev[i])>pt){ch++;cm[i]=1}}
+  /* Rauschen entfernen: nur Zellen mit mindestens 3 Nachbarn im 3x3-Feld zaehlen fuer den Rahmen */
+  if(ch){for(let y=0;y<48;y++)for(let x=0;x<64;x++){const i=y*64+x;if(!cm[i])continue;let n=0;for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){const xx=x+dx,yy=y+dy;if(xx>=0&&xx<64&&yy>=0&&yy<48&&cm[yy*64+xx])n++}
+    if(n>=3){if(x<x0)x0=x;if(x>x1)x1=x;if(y<y0)y0=y;if(y>y1)y1=y}}}
   const pct=s.prev&&tot?ch/tot*100:0;s.prev=cur;s.motionPct=s.motionPct*0.4+pct*0.6;
   const on=pct>areaMin&&x1>=x0;
   s.motionBox=on?[x0/64,y0/48,(x1-x0+1)/64,(y1-y0+1)/48]:null;
   s.bar.style.width=Math.min(100,s.motionPct*10)+'%';
-  if(on){s.motionUntil=now+800;if(now-(s.lastMotionLog||0)>8000){s.lastMotionLog=now;addLog(s,'motion',(z?'Zonenalarm: Bewegung in der Zone':'Bewegung erkannt')+' ('+pct.toFixed(1)+' %)',fullSnap(s));alarm()}}
+  if(on){s.motionUntil=now+800;s.zbox=s.motionBox;s.zboxT=now;if(now-(s.lastMotionLog||0)>8000){s.lastMotionLog=now;addLog(s,'motion',(z?'Zonenalarm: Bewegung in der Zone':'Bewegung erkannt')+' ('+pct.toFixed(1)+' %)',fullSnap(s));alarm()}}
 }
 function iou(a,b){const x1=Math.max(a[0],b[0]),y1=Math.max(a[1],b[1]),x2=Math.min(a[0]+a[2],b[0]+b[2]),y2=Math.min(a[1]+a[3],b[1]+b[3]);const i=Math.max(0,x2-x1)*Math.max(0,y2-y1);return i/(a[2]*a[3]+b[2]*b[3]-i+1e-6)}
 function track(s,dets,now){
@@ -368,15 +472,17 @@ function track(s,dets,now){
     for(const t of s.tracks){if(used.has(t)||t.group!==d.group)continue;
       const dist=Math.hypot(cx-t.cx,cy-t.cy)/W;const ov=iou(d.box,t.box);const c=dist-ov*0.3;
       if((dist<0.22||ov>0.15)&&c<bc){bc=c;best=t}}
-    if(best){used.add(best);best.box=d.box;best.cx=cx;best.cy=cy;best.last=now;best.hits++;best.label=d.label;best.score=d.score;best.hist.push({t:now,x:cx,y:cy,w:d.box[2]});if(best.hist.length>14)best.hist.shift();
+    if(best){used.add(best);const dtm=now-best.last;if(dtm>0){best.vx=(best.vx||0)*.5+((d.box[0]-best.box[0])/dtm)*.5;best.vy=(best.vy||0)*.5+((d.box[1]-best.box[1])/dtm)*.5}best.cls=d.cls;best.box=d.box;best.cx=cx;best.cy=cy;best.last=now;best.hits++;best.label=d.label;best.score=d.score;best.hist.push({t:now,x:cx,y:cy,w:d.box[2]});if(best.hist.length>14)best.hist.shift();
       if(best.group==='veh')estSpeed(best,W)}
-    else{const t={id:s.nextId++,group:d.group,label:d.label,box:d.box,cx,cy,first:now,last:now,hits:1,counted:false,score:d.score,hist:[{t:now,x:cx,y:cy,w:d.box[2]}],speed:null,maxSpeed:0};s.tracks.push(t);used.add(t)}
+    else{const t={cls:d.cls,vx:0,vy:0,id:s.nextId++,group:d.group,label:d.label,box:d.box,cx,cy,first:now,last:now,hits:1,counted:false,score:d.score,hist:[{t:now,x:cx,y:cy,w:d.box[2]}],speed:null,maxSpeed:0};s.tracks.push(t);used.add(t)}
   }
   for(const t of s.tracks){
     if(!t.counted&&t.hits>=3){t.counted=true;
       if(t.group==='person'){stats.persTot++;addLog(s,'person','Person erkannt',snap(s,t.box))}
       else if(t.group==='animal'){stats.animals++;addLog(s,'animal',t.label+' erkannt (Tier, nicht Mensch)',snap(s,t.box))}
-      else{stats.cars++;t.num=stats.cars;addLog(s,'veh',t.label+' erkannt (Nr. '+t.num+')',snap(s,t.box))}
+      else if(t.group==='veh'){stats.cars++;t.num=stats.cars;addLog(s,'veh',t.label+' erkannt (Nr. '+t.num+')',snap(s,t.box))}
+    if(t.hits>=3&&!t.wantLogged&&wantCls().has(t.cls)){t.wantLogged=true;addLog(s,'wanted','Gesucht? Objekt der Klasse "'+t.label+'" im Bild (nur Klasse erkannt, nicht geprüft ob es dasselbe ist)',snap(s,t.box));alarm()}
+    if(t.hits>=3){const h0=t.hist[0],hl=t.hist[t.hist.length-1];t.moving=(hl.t-h0.t)>400&&Math.hypot(hl.x-h0.x,hl.y-h0.y)/s.video.videoWidth>0.03}
     if(t.counted&&s.zone&&!t.zoneHit&&inZone(s,t.box)){t.zoneHit=true;addLog(s,'zone','Zonenalarm: '+t.label+' in der Zone',snap(s,t.box));alarm()}}
     if(t.group==='person'&&t.counted&&!t.loitered){const lim=parseFloat(String($('loiter').value).replace(',','.'))||20;if((now-t.first)/1000>lim){const sp=Math.hypot(t.cx-t.hist[0].x,t.cy-t.hist[0].y)/s.video.videoWidth;t.loitered=true;addLog(s,'loiter','Herumlungern: Person seit über '+Math.round(lim)+' s im Bild',snap(s,t.box));alarm()}}
   }
@@ -392,23 +498,115 @@ function estSpeed(t,W){
   const kmh=Math.abs(dx)/dt*(real/mw)*3.6;if(!isFinite(kmh)||kmh>200)return;
   t.speed=t.speed==null?kmh:t.speed*0.6+kmh*0.4;t.maxSpeed=Math.max(t.maxSpeed,t.speed);
 }
+const OTHER={backpack:'Rucksack',handbag:'Handtasche',suitcase:'Koffer',bicycle:'Fahrrad',umbrella:'Regenschirm',bottle:'Flasche','cell phone':'Handy',laptop:'Laptop',skateboard:'Skateboard',chair:'Stuhl',tv:'Fernseher',book:'Buch',scissors:'Schere',knife:'Messer','teddy bear':'Teddy',clock:'Uhr',cup:'Tasse',boat:'Boot',kite:'Drachen'};
+const cn=c=>VEH[c]||ANI[c]||OTHER[c]||c;
+function wantCls(){const st=new Set();refs.forEach(r=>{if(r.type==='obj')st.add(r.cls)});return st}
 async function objects(s,now){
   if(!models.coco||!feat.obj)return;
-  const preds=await models.coco.detect(s.video,20,0.45);
-  const dets=[];
-  for(const p of preds){if(p.class==='person')dets.push({group:'person',label:'Person',box:p.bbox,score:p.score});else if(VEH[p.class])dets.push({group:'veh',label:VEH[p.class],box:p.bbox,score:p.score});else if(feat.animal&&ANI[p.class])dets.push({group:'animal',label:ANI[p.class],box:p.bbox,score:p.score})}
+  const t0=performance.now();const preds=await models.coco.detect(s.video,25,0.3);
+  const dt=performance.now()-t0;models.ms=models.ms?models.ms*0.7+dt*0.3:dt;models.n=(models.n||0)+1;
+  if(models.base==='mobilenet_v2'&&models.n>=3&&models.ms>900&&!models.switching){models.switching=true;setAI('Gerät zu langsam für das genaue Modell ('+Math.round(models.ms)+' ms), wechsle zum schnellen ...','warn');
+    try{models.coco=await cocoSsd.load({base:'lite_mobilenet_v2'});models.base='lite_mobilenet_v2';models.ms=0;models.n=0;$('fModel').value=models.base;setAI('an ('+tf.getBackend()+', schnelles Modell automatisch gewählt)','ok')}catch(e){}models.switching=false}
+  const wc=wantCls();const dets=[];
+  for(const p of preds){
+    if(p.class==='person'){if(p.score>=0.35)dets.push({group:'person',label:'Person',box:p.bbox,score:p.score,cls:p.class})}
+    else if(VEH[p.class]){if(p.score>=0.4)dets.push({group:'veh',label:VEH[p.class],box:p.bbox,score:p.score,cls:p.class})}
+    else if(ANI[p.class]){if(feat.animal&&p.score>=0.4)dets.push({group:'animal',label:ANI[p.class],box:p.bbox,score:p.score,cls:p.class})}
+    else if(wc.has(p.class)&&p.score>=0.4)dets.push({group:'other',label:cn(p.class),box:p.bbox,score:p.score,cls:p.class});
+  }
   track(s,dets,now);
 }
 function matchFace(desc){
   let best=null,bd=1;for(const g of gallery){for(const d of g.descs){const e=faceapi.euclideanDistance(desc,d);if(e<bd){bd=e;best=g}}}
   return bd<0.56?{g:best,d:bd}:null;
 }
+/* ----- Referenzbibliothek (Gesucht) ----- */
+const refs=[];
+const STRICT={loose:[0.50,0.62],normal:[0.46,0.58],strict:[0.42,0.52]};let strict='normal';
+function loadRefs(){try{const j=JSON.parse(localStorage.getItem('sw_refs')||'[]');j.forEach(r=>{r.descs=(r.descs||[]).map(a=>Float32Array.from(a));r.today=0;r.hits=0;refs.push(r)})}catch(e){}}
+function saveRefs(){try{localStorage.setItem('sw_refs',JSON.stringify(refs.map(r=>({id:r.id,name:r.name,type:r.type,cls:r.cls,thumbs:r.thumbs,photos:r.photos,descs:r.descs.map(d=>Array.from(d))}))))}catch(e){$('refMsg').textContent='Speichern im Browser nicht möglich (Speicher voll oder privater Modus). Die Referenzen gelten nur bis zum Neuladen.'}}
+function matchRef(desc,box,W){
+  let best=null,bd=9;
+  for(const r of refs){if(r.type!=='face')continue;let d=9;for(const x of r.descs){const e=faceapi.euclideanDistance(desc,x);if(e<d)d=e}if(d<bd){bd=d;best=r}}
+  if(!best)return null;const [ts,tm]=STRICT[strict];
+  if(bd<ts)return {ref:best,d:bd,lvl:box[2]<0.05*W?'maybe':'sure'};
+  if(bd<tm)return {ref:best,d:bd,lvl:'maybe'};
+  return null;
+}
+function loadImg(file){return new Promise((res,rej)=>{const u=URL.createObjectURL(file);const i=new Image();i.onload=()=>{res(i)};i.onerror=()=>rej(new Error('Bild nicht lesbar'));i.src=u})}
+function toCanvas(img,max){const k=Math.min(1,max/Math.max(img.naturalWidth,img.naturalHeight));const c=document.createElement('canvas');c.width=Math.round(img.naturalWidth*k);c.height=Math.round(img.naturalHeight*k);c.getContext('2d').drawImage(img,0,0,c.width,c.height);return c}
+let ssdLoaded=false;
+async function refDetect(canvas){
+  const MU='https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.13/model/';
+  try{if(!ssdLoaded){await faceapi.nets.ssdMobilenetv1.loadFromUri(MU);ssdLoaded=true}
+    const r=await faceapi.detectAllFaces(canvas,new faceapi.SsdMobilenetv1Options({minConfidence:0.4,maxResults:10})).withFaceLandmarks(true).withFaceDescriptors();if(r.length)return r}catch(e){console.warn('ssd',e)}
+  return await faceapi.detectAllFaces(canvas,new faceapi.TinyFaceDetectorOptions({inputSize:608,scoreThreshold:0.3})).withFaceLandmarks(true).withFaceDescriptors();
+}
+async function waitModels(){for(let i=0;i<120&&models.state!=='bereit';i++){if(models.state==='aus')startAnalysis();await sleep(500)}return models.state==='bereit'&&models.face}
+let refBusy=0;
+async function addRefPhoto(name,file){
+  if(!await waitModels())return {ok:false,msg:'Gesichts-Modell nicht geladen'};
+  refBusy++;try{return await addRefPhoto2(name,file)}finally{refBusy--}
+}
+async function addRefPhoto2(name,file){
+  const img=await loadImg(file);const c=toCanvas(img,1280);
+  const res=await refDetect(c);
+  if(!res.length)return {ok:false,msg:'Kein Gesicht gefunden. Nimm ein Foto, auf dem das Gesicht groß und von vorn zu sehen ist.'};
+  res.sort((a,b)=>b.detection.box.width*b.detection.box.height-a.detection.box.width*a.detection.box.height);
+  const r0=res[0],b=r0.detection.box;
+  const m=Math.max(b.width,b.height)*0.35,sz=Math.max(b.width,b.height)+2*m;const t=document.createElement('canvas');t.width=t.height=64;
+  t.getContext('2d').drawImage(c,b.x+b.width/2-sz/2,b.y+b.height/2-sz/2,sz,sz,0,0,64,64);
+  let ref=refs.find(r=>r.type==='face'&&r.name.toLowerCase()===name.toLowerCase());
+  if(!ref){ref={id:'r'+Date.now()+Math.random().toString(36).slice(2,5),name,type:'face',descs:[],thumbs:[],photos:0,today:0,hits:0};refs.push(ref)}
+  ref.descs.push(r0.descriptor);ref.thumbs.push(t.toDataURL('image/jpeg',.6));ref.photos++;
+  saveRefs();renderRefs();
+  return {ok:true,msg:res.length>1?'Mehrere Gesichter im Foto, das größte wurde verwendet.':'ok',n:res.length};
+}
+async function addObjPhoto(file){
+  if(!await waitModels()||!models.coco)return {ok:false,msg:'Objekt-Modell nicht geladen'};
+  refBusy++;try{return await addObjPhoto2(file)}finally{refBusy--}
+}
+async function addObjPhoto2(file){
+  const img=await loadImg(file);const c=toCanvas(img,640);
+  const preds=(await models.coco.detect(c,10,0.3)).filter(p=>p.class!=='person');
+  if(!preds.length)return {ok:false,msg:'Kein bekanntes Objekt erkannt (die KI kennt nur 80 Standardklassen wie Hund, Rucksack, Auto).'};
+  preds.sort((a,b)=>b.bbox[2]*b.bbox[3]*b.score-a.bbox[2]*a.bbox[3]*a.score);const p=preds[0];
+  const t=document.createElement('canvas');t.width=t.height=64;const [x,y,w,h]=p.bbox,sz=Math.max(w,h);t.getContext('2d').drawImage(c,x+w/2-sz/2,y+h/2-sz/2,sz,sz,0,0,64,64);
+  if(!refs.find(r=>r.type==='obj'&&r.cls===p.class)){refs.push({id:'o'+Date.now(),name:cn(p.class),type:'obj',cls:p.class,descs:[],thumbs:[t.toDataURL('image/jpeg',.6)],photos:1,today:0,hits:0})}
+  saveRefs();renderRefs();return {ok:true,msg:'Erkannt als Klasse "'+cn(p.class)+'" ('+Math.round(p.score*100)+' %). Das ist nur die Klasse, nicht dein genaues Exemplar.'};
+}
+function renderRefs(){
+  const el=$('refList');el.innerHTML='';
+  if(!refs.length){el.innerHTML='<span class="mu sm">Noch keine Referenzen.</span>';return}
+  refs.forEach(r=>{const d=document.createElement('div');d.className='refrow';
+    const th=document.createElement('div');th.className='th';r.thumbs.slice(0,5).forEach(u=>{const i=document.createElement('img');i.src=u;th.appendChild(i)});d.appendChild(th);
+    const nm=document.createElement('div');nm.className='nm';
+    nm.innerHTML='<b></b><div class="sm mu"></div>';nm.querySelector('b').textContent=r.name+(r.type==='obj'?' (nur Klasse)':'');
+    nm.querySelector('.sm').textContent=r.type==='face'?(r.descs.length+' Foto'+(r.descs.length===1?'':'s')+' mit Gesicht'+(r.descs.length<3?' (besser: 3 oder mehr, aus verschiedenen Jahren)':'')+' | Treffer heute: '+(r.today||0)):'Markiert jedes Ding dieser Klasse, prüft nicht ob es dasselbe ist';
+    d.appendChild(nm);
+    if(r.type==='face'){const b=document.createElement('button');b.className='btn sec sm';b.textContent='Foto hinzufügen';b.onclick=()=>{$('refName').value=r.name;$('refFile').click()};d.appendChild(b)}
+    const x=document.createElement('button');x.className='btn bad sm';x.textContent='Löschen';x.onclick=()=>{refs.splice(refs.indexOf(r),1);saveRefs();renderRefs()};d.appendChild(x);
+    el.appendChild(d)});
+}
+function wantedHit(s,w,box,now){
+  const r=w.ref;r.lastHit=r.lastHit||{};
+  if(now-(r.lastHit[s.id]||0)<15000)return;r.lastHit[s.id]=now;
+  const dk=new Date().toDateString();if(r.dayKey!==dk){r.dayKey=dk;r.today=0}r.today++;r.hits++;
+  addLog(s,'wanted','GESUCHT: '+r.name+' erkannt ('+(w.lvl==='sure'?'sicher':'unsicher')+', Abstand '+w.d.toFixed(2)+'). Treffer heute: '+r.today,snap(s,box,0.4));alarm();renderRefs();
+}
 async function faces(s,now){
-  if(!models.face||!feat.face)return;if(now-s.lastFace<1500)return;s.lastFace=now;
-  const res=await faceapi.detectAllFaces(s.video,new faceapi.TinyFaceDetectorOptions({inputSize:320,scoreThreshold:0.5})).withFaceLandmarks(true).withFaceDescriptors();
+  if(!models.face||!feat.face)return;if(now-s.lastFace<1200)return;s.lastFace=now;
+  const W=s.video.videoWidth;
+  const res=await faceapi.detectAllFaces(s.video,new faceapi.TinyFaceDetectorOptions({inputSize:sources.size>2?320:416,scoreThreshold:0.4})).withFaceLandmarks(true).withFaceDescriptors();
   s.faces=[];
   for(const r of res){
-    const b=r.detection.box;const box=[b.x,b.y,b.width,b.height];let m=matchFace(r.descriptor);let g;
+    const b=r.detection.box;const box=[b.x,b.y,b.width,b.height];
+    const w=refs.length?matchRef(r.descriptor,box,W):null;
+    if(w){s.faces.push({box,label:w.ref.name,t:now,want:true,lvl:w.lvl,d:w.d});wantedHit(s,w,box,now);
+      const cx=box[0]+box[2]/2,cy=box[1]+box[3]/2;const tr=s.tracks.find(t=>t.group==='person'&&cx>t.box[0]&&cx<t.box[0]+t.box[2]&&cy>t.box[1]&&cy<t.box[1]+t.box[3]);
+      if(tr)tr.want={name:w.ref.name,lvl:w.lvl,until:now+2500};
+      continue}
+    let m=matchFace(r.descriptor);let g;
     if(m){g=m.g;if(now-g.last>30000){g.visits++;const dk0=new Date().toDateString();if(g.dayKey!==dk0){g.dayKey=dk0;g.today=0}g.today++;addLog(s,'face',g.label+' wieder gesehen (heute '+g.today+'x)',snap(s,box,0.3))}g.last=now;g.seen++;const dk=new Date().toDateString();g.days[dk]=g.days[dk]||{};if(g.descs.length<6&&m.d>0.25)g.descs.push(r.descriptor)}
     else{g={label:'Person '+(++faceN),days:{},descs:[r.descriptor],first:now,last:now,seen:1,visits:1,today:1,dayKey:new Date().toDateString(),img:snap(s,box,0.3)};gallery.push(g);addLog(s,'face','Neues Gesicht: '+g.label,g.img)}
     s.faces.push({box,label:g.label,t:now});
@@ -419,15 +617,35 @@ function renderFaces(){
   const el=$('faces');if(!gallery.length)return;el.innerHTML='';
   gallery.forEach(g=>{const d=document.createElement('div');d.className='face';const i=document.createElement('img');i.src=g.img||'';d.appendChild(i);const t=document.createElement('div');t.textContent=g.label;d.appendChild(t);const u=document.createElement('div');u.className='mu';u.textContent='heute '+(g.today||0)+'x, gesamt '+g.visits+'x';d.appendChild(u);el.appendChild(d)});
 }
+const RED='#ff2d2d';
+function zoomTo(s,now){
+  const el=s.canvas.parentNode;let sc=1,cx=.5,cy=.5;
+  if(feat.zmove&&!s.drawing&&s.zbox&&now-s.zboxT<1800){const [x,y,w,h]=s.zbox;const k=Math.min(3,0.6/Math.max(w,h,0.05));if(k>=1.4){sc=k;cx=x+w/2;cy=y+h/2}}
+  const a=sc===1?0.08:0.15;s.zsc+=(sc-s.zsc)*a;s.zx+=(cx-s.zx)*a;s.zy+=(cy-s.zy)*a;
+  if(Math.abs(s.zsc-1)<0.02&&sc===1){if(el.style.transform)el.style.transform='';return}
+  const L=Math.min(Math.max(s.zx-0.5/s.zsc,0),1-1/s.zsc),T=Math.min(Math.max(s.zy-0.5/s.zsc,0),1-1/s.zsc);
+  el.style.transform='scale('+s.zsc.toFixed(3)+') translate('+(-L*100).toFixed(2)+'%,'+(-T*100).toFixed(2)+'%)';
+}
 function draw(s,now){
   const v=s.video,c=s.canvas;if(!v.videoWidth)return;if(c.width!==v.videoWidth){c.width=v.videoWidth;c.height=v.videoHeight;s.tile.querySelector('.vw').style.aspectRatio=v.videoWidth+'/'+v.videoHeight}
+  zoomTo(s,now);
   const g=c.getContext('2d');g.clearRect(0,0,c.width,c.height);const k=c.width/640;g.lineWidth=2*k;g.font=(14*k)+'px sans-serif';
-  const lab=(txt,x,y,col)=>{const w=g.measureText(txt).width+8*k;g.fillStyle=col;g.fillRect(x,Math.max(0,y-18*k),w,18*k);g.fillStyle='#000';g.fillText(txt,x+4*k,Math.max(14*k,y-4*k))};
+  const lab=(txt,x,y,col,fg)=>{const w=g.measureText(txt).width+8*k;g.fillStyle=col;g.fillRect(x,Math.max(0,y-18*k),w,18*k);g.fillStyle=fg||'#000';g.fillText(txt,x+4*k,Math.max(14*k,y-4*k))};
   if(s.zone){const z=s.zone;g.fillStyle='rgba(255,92,108,.12)';g.fillRect(z[0]*c.width,z[1]*c.height,z[2]*c.width,z[3]*c.height);g.strokeStyle='#ff5c6c';g.setLineDash([]);g.strokeRect(z[0]*c.width,z[1]*c.height,z[2]*c.width,z[3]*c.height)}
-  if(s.motionBox&&feat.motion&&Date.now()<(s.motionUntil||0)){const [x,y,w,h]=s.motionBox;g.strokeStyle='#ffb020';g.setLineDash([6*k,4*k]);g.strokeRect(x*c.width,y*c.height,w*c.width,h*c.height);g.setLineDash([])}
-  for(const t of s.tracks){if(t.hits<2||now-t.last>1000)continue;const [x,y,w,h]=t.box;const col=t.group==='person'?'#4aa3ff':t.group==='animal'?'#ffd34a':'#3ddc97';g.strokeStyle=col;g.strokeRect(x,y,w,h);
-    let txt=t.label+(t.group==='veh'&&t.num?' #'+t.num:'');if(t.group==='person'&&t.loitered)txt+=' (lungert)';if(t.group==='veh'&&t.speed)txt+=' ~'+Math.round(t.speed)+' km/h?';lab(txt,x,y,col)}
-  for(const f of s.faces){if(now-f.t>1300)continue;g.strokeStyle='#ff5ccf';g.strokeRect(f.box[0],f.box[1],f.box[2],f.box[3]);lab(f.label,f.box[0],f.box[1],'#ff5ccf')}
+  const wc=wantCls();
+  for(const t of s.tracks){if(t.hits<2||now-t.last>Math.max(1000,(models.ms||0)*3))continue;
+    const dtp=Math.min(now-t.last,700);let [x,y,w,h]=t.box;x+=(t.vx||0)*dtp;y+=(t.vy||0)*dtp;
+    const wanted=t.want&&t.want.until>now?t.want:null;const wobj=wc.has(t.cls);
+    const col=t.group==='person'?'#4aa3ff':t.group==='animal'?'#ffd34a':t.group==='other'?'#c9a0ff':'#3ddc97';
+    let txt=t.label+(t.group==='veh'&&t.num?' #'+t.num:'');if(t.group==='person'&&t.loitered)txt+=' (lungert)';if(t.group==='veh'&&t.speed)txt+=' ~'+Math.round(t.speed)+' km/h?';
+    if(wanted||wobj){g.strokeStyle=RED;g.lineWidth=5*k;g.setLineDash(wanted&&wanted.lvl==='sure'||wobj&&false?[]:[10*k,6*k]);g.strokeRect(x,y,w,h);g.setLineDash([]);
+      lab(wanted?('GESUCHT: '+wanted.name+(wanted.lvl==='sure'?' (sicher)':' (unsicher)')):('Gesucht? '+t.label+' (nur Klasse)'),x,y,RED,'#fff');g.lineWidth=2*k}
+    else if(t.moving){g.strokeStyle=RED;g.lineWidth=3*k;g.strokeRect(x,y,w,h);lab(txt+' (bewegt sich)',x,y,RED,'#fff');g.lineWidth=2*k}
+    else{g.strokeStyle=col;g.strokeRect(x,y,w,h);lab(txt,x,y,col)}}
+  if(s.motionBox&&feat.motion&&now<(s.motionUntil||0)){const [x,y,w,h]=s.motionBox;g.strokeStyle=RED;g.lineWidth=4*k;g.strokeRect(x*c.width,y*c.height,w*c.width,h*c.height);lab('Bewegung',x*c.width,y*c.height,RED,'#fff');g.lineWidth=2*k}
+  for(const f of s.faces){if(now-f.t>Math.max(1900,(models.ms||0)*4))continue;
+    if(f.want){g.strokeStyle=RED;g.lineWidth=5*k;g.setLineDash(f.lvl==='sure'?[]:[10*k,6*k]);g.strokeRect(f.box[0],f.box[1],f.box[2],f.box[3]);g.setLineDash([]);lab('GESUCHT: '+f.label+(f.lvl==='sure'?' (sicher)':' (unsicher)')+' d='+f.d.toFixed(2),f.box[0],f.box[1],RED,'#fff');g.lineWidth=2*k}
+    else{g.strokeStyle='#ff5ccf';g.strokeRect(f.box[0],f.box[1],f.box[2],f.box[3]);lab(f.label,f.box[0],f.box[1],'#ff5ccf')}}
   s.info.textContent=(s.persNow?s.persNow+' Pers. ':'')+(s.tracks.some(t=>t.group==='animal'&&now-t.last<1000)?'Tier ':'')+(s.tracks.filter(t=>t.group==='veh'&&now-t.last<1000).length?'Fahrzeug ':'')+(s.motionPct>1?'Bewegung':'');
 }
 function updateStats(){
@@ -437,13 +655,12 @@ function updateStats(){
 async function loop(){
   for(;;){
     const list=[...sources.values()].filter(s=>s.video.readyState>=2&&s.video.videoWidth);
-    if(!list.length){await sleep(300);continue}
+    if(!list.length||refBusy){await sleep(300);continue}
     for(const s of list){
       const now=Date.now();
-      try{if(feat.motion)motion(s,now);else{s.motionBox=null;s.motionPct=0;s.bar.style.width='0'}
+      try{
         if(models.state==='bereit'){await objects(s,Date.now());await faces(s,Date.now())}
       }catch(e){console.warn('analyse',e)}
-      draw(s,Date.now());
     }
     updateStats();
     await sleep(40);
@@ -455,10 +672,23 @@ $('bControl').onclick=()=>startControl(false);
 $('bSingle').onclick=()=>startControl(true);
 $('bJoin').onclick=()=>{const c=$('joinCode').value.trim();if(c)startCameraDevice(c)};
 $('localCam').onclick=()=>addLocalCam();
+$('ctrlRetry').onclick=()=>{if(ctrlPeer&&ctrlPeer.open&&!ctrlPeer.disconnected){setNet('Bereit für Kameras','ok');return}openCtrlPeer(ctrlCode||rid())};
 $('fMotion').onchange=e=>feat.motion=e.target.checked;
 $('sens').oninput=e=>{feat.sens=+e.target.value;$('sensVal').textContent=e.target.value};
 $('fSound').onchange=e=>{feat.sound=e.target.checked;if(feat.sound)alarm()};
 $('fZoom').onchange=e=>feat.zoom=e.target.checked;
+$('fZmove').onchange=e=>feat.zmove=e.target.checked;
+$('fModel').onchange=async e=>{const b=e.target.value;localStorage.setItem('sw_model',b);setAI('lädt Objekt-Modell ...','warn');try{models.coco=await cocoSsd.load({base:b});models.base=b;setAI('an ('+tf.getBackend()+', '+b+')','ok')}catch(x){setAI('Modellwechsel fehlgeschlagen','err')}};
+$('refAdd').onclick=()=>{if(!$('refName').value.trim()){$('refMsg').textContent='Bitte zuerst einen Namen eingeben.';return}$('refFile').click()};
+$('refFile').onchange=async e=>{const name=$('refName').value.trim();const files=[...e.target.files];e.target.value='';if(!name||!files.length)return;
+  let ok=0,msgs=[];for(let i=0;i<files.length;i++){$('refMsg').textContent='Analysiere Foto '+(i+1)+' von '+files.length+' ...';try{const r=await addRefPhoto(name,files[i]);if(r.ok){ok++;if(r.msg!=='ok')msgs.push(r.msg)}else msgs.push('Foto '+(i+1)+': '+r.msg)}catch(x){msgs.push('Foto '+(i+1)+': '+(x.message||x))}}
+  $('refMsg').textContent=ok+' von '+files.length+' Foto(s) übernommen. '+msgs.join(' ')};
+$('objAdd').onclick=()=>$('objFile').click();
+$('objFile').onchange=async e=>{const f=e.target.files[0];e.target.value='';if(!f)return;$('refMsg').textContent='Analysiere ...';try{const r=await addObjPhoto(f);$('refMsg').textContent=r.msg}catch(x){$('refMsg').textContent='Fehler: '+(x.message||x)}};
+$('refStrict').onchange=e=>{strict=e.target.value;try{localStorage.setItem('sw_strict',strict)}catch(x){}};
+$('refWipe').onclick=()=>{refs.length=0;saveRefs();renderRefs()};
+try{const sv=localStorage.getItem('sw_strict');if(sv&&STRICT[sv]){strict=sv;$('refStrict').value=sv}}catch(e){}
+loadRefs();renderRefs();
 $('backdrop').onclick=()=>unspot();
 $('fAnimal').onchange=e=>feat.animal=e.target.checked;
 $('fObj').onchange=e=>feat.obj=e.target.checked;
@@ -467,7 +697,7 @@ $('wipeFaces').onclick=()=>{gallery.length=0;faceN=0;$('faces').innerHTML='<span
 $('stopAll').onclick=()=>{try{ctrlPeer&&ctrlPeer.destroy()}catch(e){}sources.forEach(s=>s.stream&&s.stream.getTracks().forEach(t=>t.stop()));sessionStorage.removeItem('sw_code');location.hash='';location.reload()};
 const m=location.hash.match(/join=([A-Za-z0-9]+)/);
 if(m){startCameraDevice(m[1])}
-window.__sw={sources,gallery,stats,models,logs,feat};
+window.__sw={sources,gallery,stats,models,logs,feat,refs,addRefPhoto,addObjPhoto,get strict(){return strict}};
 })();
 </script>
 </body>
