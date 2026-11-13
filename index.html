@@ -60,6 +60,7 @@ details>summary{cursor:pointer;font-weight:600;padding:6px 0}
 .refrow .th{display:flex;gap:4px}.refrow .th img{width:42px;height:42px;object-fit:cover;border-radius:6px;border:1px solid var(--line)}
 .refrow .nm{flex:1;min-width:140px}
 input.plain{text-transform:none;letter-spacing:0;font-size:16px}
+.bigmsg{font-size:18px;line-height:1.45;color:var(--tx);background:#1d2a3a;border-left:4px solid var(--wa);border-radius:10px;padding:12px;margin:8px 0}
 .diag{font:12px/1.4 ui-monospace,Menlo,monospace;color:var(--mu);word-break:break-word}
 select{background:var(--card2);color:var(--tx);border:1px solid var(--line);border-radius:10px;padding:8px;font-size:15px}
 </style>
@@ -99,7 +100,7 @@ select{background:var(--card2);color:var(--tx);border:1px solid var(--line);bord
     <div class="row"><button class="btn sec sm" id="camFlip">Kamera wechseln</button><button class="btn bad sm" id="camStop">Beenden</button></div>
     <button class="btn hide" id="camRetry">Erneut verbinden</button>
     <div class="diag" id="camDiag"></div>
-    <p class="sm mu" id="camMsg">Tippe auf Start, erlaube die Kamera. Danach das Gerät hinstellen und Bildschirm anlassen.</p>
+    <p class="bigmsg" id="camMsg">Tippe auf Start und erlaube die Kamera. Wichtig: gleiches WLAN wie das Kontrollgerät (kein Mobilfunk). Danach das Gerät hinstellen und den Bildschirm anlassen.</p>
   </div>
 </section>
 
@@ -117,6 +118,7 @@ select{background:var(--card2);color:var(--tx);border:1px solid var(--line);bord
         <h2>Kamerageräte verbinden</h2>
         <div class="qrbox" id="qr"></div>
         <div class="code" id="codeTxt"></div>
+        <div class="bigmsg" style="font-size:16px">Wichtig: Beide Geräte ins <b>gleiche WLAN</b>. Mobilfunk (5G) klappt oft nicht. Diese Seite offen lassen, Bildschirm nicht ausgehen lassen.</div>
         <div class="sm mu" style="text-align:center">Auf dem Kameragerät: QR mit der Kamera-App scannen und den Link öffnen. Oder die Seite öffnen, "Beitreten" und diesen Code eingeben.</div>
         <div class="sm mu" id="linkTxt" style="word-break:break-all;margin-top:6px"></div>
         <div class="row" style="margin-top:8px"><button class="btn sec sm" id="copyLink">Link kopieren</button><button class="btn sec sm" id="ctrlRetry">Neu verbinden</button><button class="btn sec sm" id="localCam">Kamera dieses Geräts hinzufügen</button></div>
@@ -224,7 +226,7 @@ async function connectCam(){
   $('camStart').disabled=true;$('camRetry').classList.add('hide');$('camDiag').textContent='Kamera wird angefragt (Erlaubnis-Dialog bestätigen) ...';
   if(!camStream){
     setCamStatus('Kamera wird gestartet...','warn');
-    try{camStream=await getCam()}catch(e){setCamStatus('Keine Kamera','err');$('camMsg').textContent='Kamerazugriff nicht möglich ('+(e.name||e.message)+'). Erlaube die Kamera in den Browser-Einstellungen (Safari: Aa-Symbol, Website-Einstellungen) und tippe erneut.';$('camStart').disabled=false;$('camRetry').classList.remove('hide');return}
+    try{camStream=await getCam()}catch(e){setCamStatus('Keine Kamera','err');$('camMsg').textContent='Die Kamera ist nicht erlaubt. Tippe in Safari links in der Adresszeile auf "Aa", dann auf "Website-Einstellungen" und erlaube die Kamera. Danach hier "Erneut verbinden". ('+(e.name||e.message)+')';$('camStart').disabled=false;$('camRetry').classList.remove('hide');return}
     $('camVideo').srcObject=camStream;
   }
   try{wake=await navigator.wakeLock.request('screen')}catch(e){}
@@ -236,13 +238,13 @@ function dial(){
   const cands={};let broker='verbinde',sig='-',ice='-';
   const diag=()=>{$('camDiag').textContent='Versuch '+camTries+'/3 | Server: '+broker+' | Antwort vom Kontrollgerät: '+sig+' | Verbindung: '+ice+' | Kandidaten: '+candTxt(cands)+(RELAY?' | NUR RELAY':'')};
   const fail=(st,msg)=>{if(my!==camGen)return;clearTimeout(camTimer);setCamStatus(st,'err');$('camMsg').textContent=msg;$('camStart').disabled=false;$('camRetry').classList.remove('hide');diag()};
-  const retry=why=>{if(camTries>=3)return false;$('camMsg').textContent=why+' Neuer Versuch in 3 Sekunden ...';setCamStatus('Neuer Versuch ...','warn');camTimer=setTimeout(()=>{if(my===camGen)dial()},3000);return true};
+  const retry=why=>{if(camTries>=3)return false;$('camMsg').textContent=why+' Ich versuche es gleich nochmal ...';setCamStatus('Neuer Versuch ...','warn');camTimer=setTimeout(()=>{if(my===camGen)dial()},3000);return true};
   setCamStatus('Verbinde ('+camTries+'/3) ...','warn');$('camMsg').textContent='Verbindung wird aufgebaut ...';diag();
   camPeer=new Peer(PEER_OPTS);
-  setTimeout(()=>{if(my!==camGen||broker==='ok')return;broker='keine Antwort (12 s)';diag();if(!retry('Vermittlungsserver antwortet nicht (Netz blockiert 0.peerjs.com?).'))fail('Server nicht erreichbar','Der Vermittlungsserver 0.peerjs.com antwortet nicht. Möglich: Firmen-/Schul-WLAN oder Werbeblocker blockiert ihn. Mobilnetz oder anderes WLAN probieren, dann "Erneut verbinden".')},12000);
+  setTimeout(()=>{if(my!==camGen||broker==='ok')return;broker='keine Antwort (12 s)';diag();if(!retry('Vermittlungsserver antwortet nicht (Netz blockiert 0.peerjs.com?).'))fail('Server nicht erreichbar','Die Verbindungsstelle im Internet antwortet nicht. Vielleicht blockiert das WLAN oder ein Werbeblocker sie. Probiere ein anderes WLAN oder das Mobilnetz. Dann "Erneut verbinden".')},12000);
   camPeer.on('error',e=>{if(my!==camGen)return;
-    if(e.type==='peer-unavailable'){broker='ok';sig='Code nicht gefunden';diag();if(!retry('Das Kontrollgerät mit diesem Code ist nicht online.'))fail('Kontrollgerät nicht gefunden','Das Kontrollgerät mit diesem Code ist nicht online. Dort die Seite offen lassen und den Bildschirm anlassen (iPad nicht sperren), Code prüfen, dann "Erneut verbinden".')}
-    else{broker='Fehler '+e.type;diag();if(!retry('Vermittlungsserver nicht erreichbar ('+e.type+').'))fail('Server nicht erreichbar','Der kostenlose Vermittlungsserver (0.peerjs.com) ist nicht erreichbar ('+e.type+'). Internet prüfen, dann "Erneut verbinden".')}});
+    if(e.type==='peer-unavailable'){broker='ok';sig='Code nicht gefunden';diag();if(!retry('Das Kontrollgerät ist gerade nicht zu finden.'))fail('Kontrollgerät nicht gefunden','Das Kontrollgerät ist nicht zu finden. Mach Folgendes: 1) Auf dem Kontrollgerät die Seite offen lassen und den Bildschirm nicht ausgehen lassen. 2) Auf dem Kontrollgerät den QR-Code neu zeigen und hier neu scannen. 3) Dann hier "Erneut verbinden".')}
+    else{broker='Fehler '+e.type;diag();if(!retry('Vermittlungsserver nicht erreichbar ('+e.type+').'))fail('Server nicht erreichbar','Die Verbindungsstelle im Internet ist gerade nicht erreichbar. Prüfe, ob dieses Gerät Internet hat. Dann "Erneut verbinden".')}});
   camPeer.on('disconnected',()=>{if(my!==camGen)return;broker='getrennt';diag();try{camPeer.reconnect()}catch(e){}});
   camPeer.on('open',()=>{
     if(my!==camGen)return;broker='ok';diag();
@@ -252,7 +254,7 @@ function dial(){
     const pc=camCall.peerConnection;
     const upd=()=>{if(my!==camGen)return;ice=pc.iceConnectionState;sig=pc.signalingState==='stable'?'ja':'noch nicht';diag();
       if(ice==='connected'||ice==='completed'){clearTimeout(camTimer);setCamStatus('Verbunden, sendet Video','ok');$('camMsg').textContent='Läuft. Gerät hinstellen, Bildschirm anlassen.';$('camRetry').classList.add('hide');$('camStart').disabled=true}
-      else if(ice==='failed'){clearTimeout(camTimer);if(!retry('Direkte Verbindung fehlgeschlagen.'))fail('Verbindung fehlgeschlagen','Die Geräte finden keinen Weg zueinander. Tipp: beide Geräte ins selbe WLAN oder auf einem Gerät das Mobilnetz ausschalten, dann "Erneut verbinden".')}
+      else if(ice==='failed'){clearTimeout(camTimer);if(!retry('Direkte Verbindung fehlgeschlagen.'))fail('Verbindung fehlgeschlagen','Die zwei Geräte finden keinen Weg zueinander. Mach Folgendes: Beide Geräte ins GLEICHE WLAN. Mobilfunk (5G) schalten. Dann hier "Erneut verbinden".')}
       else if(ice==='disconnected')setCamStatus('Unterbrochen ...','warn');
       else setCamStatus('Verbinde ('+camTries+'/3) ...','warn')};
     watchPc(pc,cands,upd);upd();
@@ -261,10 +263,10 @@ function dial(){
     camTimer=setTimeout(()=>{
       if(my!==camGen)return;const st=pc.iceConnectionState;if(st==='connected'||st==='completed')return;
       let why;
-      if(pc.signalingState!=='stable')why='Das Kontrollgerät hat nicht geantwortet (ist die Seite dort offen und der Bildschirm an?).';
-      else if(!cands.srflx&&!cands.relay)why='Dein Netz lässt keine STUN/TURN-Verbindung zu (nur lokale Adressen gefunden).';
-      else why='Die beiden Geräte finden keinen Weg zueinander.';
-      if(!retry(why))fail('Keine Verbindung',why+' Tipp: beide Geräte ins selbe WLAN, dann "Erneut verbinden".');
+      if(pc.signalingState!=='stable')why='Das Kontrollgerät antwortet nicht. Ist die Seite dort offen und der Bildschirm an?';
+      else if(!cands.srflx&&!cands.relay)why='Dein Netz lässt die Verbindung nicht durch. Nutze das gleiche WLAN wie das Kontrollgerät, kein Mobilfunk.';
+      else why='Die zwei Geräte finden keinen Weg zueinander. Beide ins gleiche WLAN, kein Mobilfunk (5G).';
+      if(!retry(why))fail('Keine Verbindung',why+' Danach hier "Erneut verbinden" tippen.');
     },25000);
   });
 }
