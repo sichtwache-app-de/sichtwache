@@ -1,0 +1,474 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0b1118">
+<title>Sichtwache - KI-Kamera im Browser</title>
+<style>
+:root{--bg:#0b1118;--card:#141c26;--card2:#1b2532;--line:#263344;--tx:#e8eef6;--mu:#8fa1b6;--ac:#3ddc97;--wa:#ffb020;--er:#ff5c6c;--bl:#4aa3ff}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;background:var(--bg);color:var(--tx);font:16px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+body{padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);min-height:100vh}
+.wrap{max-width:1180px;margin:0 auto;padding:14px}
+h1{font-size:22px;margin:4px 0 2px}h2{font-size:16px;margin:0 0 8px}
+.mu{color:var(--mu)}.sm{font-size:13px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px;margin-bottom:12px}
+.btn{appearance:none;border:0;background:var(--ac);color:#04281a;font-weight:700;font-size:16px;padding:13px 16px;border-radius:12px;width:100%;cursor:pointer;margin:5px 0;min-height:48px}
+.btn.sec{background:var(--card2);color:var(--tx);border:1px solid var(--line)}
+.btn.bad{background:var(--er);color:#2a0409}
+.btn.sm{width:auto;padding:8px 12px;font-size:14px;min-height:38px;margin:2px}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.pill{display:inline-block;padding:2px 9px;border-radius:99px;font-size:12px;background:var(--card2);border:1px solid var(--line);color:var(--mu)}
+.pill.ok{color:var(--ac);border-color:#1f6a4b}.pill.warn{color:var(--wa);border-color:#7a5612}.pill.err{color:var(--er);border-color:#7a2b34}
+input[type=text]{width:100%;background:var(--card2);border:1px solid var(--line);color:var(--tx);border-radius:10px;padding:12px;font-size:18px;letter-spacing:2px;text-transform:uppercase}
+.hide{display:none!important}
+.grid{display:grid;gap:12px;grid-template-columns:1fr}
+@media(min-width:700px){.grid.cams{grid-template-columns:1fr 1fr}.two{display:grid;grid-template-columns:1fr 1fr;gap:12px}}
+@media(min-width:1000px){.layout{display:grid;grid-template-columns:1.6fr 1fr;gap:12px;align-items:start}}
+.tile{background:#000;border:1px solid var(--line);border-radius:14px;overflow:hidden;position:relative}
+.tile .vw{position:relative;width:100%;background:#000;aspect-ratio:16/9}
+.tile video,.tile canvas{position:absolute;inset:0;width:100%;height:100%;object-fit:fill}
+.tile .cap{display:flex;justify-content:space-between;gap:8px;padding:8px 10px;background:var(--card);font-size:13px;flex-wrap:wrap}
+.tile .bar{height:5px;background:#223;}.tile .bar i{display:block;height:100%;background:var(--wa);width:0}
+.stats{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
+@media(min-width:420px){.stats{grid-template-columns:repeat(4,1fr)}}
+.stat{background:var(--card2);border-radius:10px;padding:10px;text-align:center}.stat b{display:block;font-size:26px}.stat span{font-size:12px;color:var(--mu)}
+.qrbox{background:#fff;border-radius:12px;padding:10px;width:230px;max-width:100%;margin:8px auto}.qrbox svg{width:100%;height:auto;display:block}
+.code{font:700 26px/1 ui-monospace,Menlo,monospace;letter-spacing:4px;text-align:center;margin:6px 0}
+.log{max-height:300px;overflow:auto}.log div{display:flex;gap:8px;align-items:center;padding:6px 0;border-bottom:1px solid var(--line);font-size:14px}
+.log img{width:44px;height:44px;object-fit:cover;border-radius:6px;flex:none}.log time{color:var(--mu);font-size:12px;flex:none}
+.faces{display:grid;grid-template-columns:repeat(auto-fill,minmax(92px,1fr));gap:8px}
+.face{background:var(--card2);border-radius:10px;padding:6px;text-align:center;font-size:12px}.face img{width:100%;aspect-ratio:1;object-fit:cover;border-radius:8px}
+.note{border-left:3px solid var(--wa);background:#2a2110;padding:8px 10px;border-radius:8px;font-size:13px;margin:8px 0}
+label.sw{display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid var(--line);gap:10px}
+label.sw input{width:22px;height:22px;accent-color:var(--ac)}
+details>summary{cursor:pointer;font-weight:600;padding:6px 0}
+.grid.cams[data-n="3"],.grid.cams[data-n="4"]{grid-template-columns:1fr 1fr;gap:8px}
+.grid.cams[data-n="3"] .cap,.grid.cams[data-n="4"] .cap{font-size:11px;padding:5px 6px}
+.grid.cams[data-n="3"] .btn.sm,.grid.cams[data-n="4"] .btn.sm{font-size:12px;padding:5px 8px;min-height:30px}
+.tile .vw{cursor:zoom-in}
+.tile.spot{position:fixed;z-index:60;left:50%;top:50%;transform:translate(-50%,-50%);width:min(96vw,1000px);box-shadow:0 0 0 3px var(--er),0 20px 80px #000}
+.tile.spot.manual{box-shadow:0 0 0 3px var(--bl),0 20px 80px #000}
+.tile.spot .vw{cursor:zoom-out}
+#backdrop{position:fixed;inset:0;background:rgba(0,0,0,.72);z-index:50}
+.camview{position:relative;border-radius:14px;overflow:hidden;background:#000}.camview video{width:100%;display:block;max-height:60vh;object-fit:cover}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<!-- HOME -->
+<section id="home">
+  <h1>Sichtwache</h1>
+  <p class="mu">KI-Kamera im Browser. Kein Konto, keine App, kein Login. Die Erkennung läuft auf deinem Gerät.</p>
+  <div class="card">
+    <button class="btn" id="bControl">Kontrollgerät starten</button>
+    <p class="sm mu" style="margin:0 0 8px">Zeigt alle Kameras, Zähler und Ereignisse. Zeigt einen QR-Code, mit dem andere Geräte als Kamera beitreten.</p>
+    <button class="btn sec" id="bSingle">Nur dieses Gerät (Kamera + Auswertung)</button>
+    <p class="sm mu" style="margin:0 0 8px">Einzelgerät-Modus, ohne Kopplung.</p>
+    <details><summary>Als Kameragerät beitreten (ohne QR-Scan)</summary>
+      <p class="sm mu">Code vom Kontrollgerät eingeben:</p>
+      <input type="text" id="joinCode" placeholder="CODE" maxlength="12" autocapitalize="characters" autocomplete="off">
+      <button class="btn sec" id="bJoin">Beitreten</button>
+    </details>
+  </div>
+  <div class="note" id="fileWarn" class="hide">Diese Seite läuft nicht über https. Kamera und QR-Kopplung funktionieren nur auf der gehosteten Seite (https) oder auf localhost.</div>
+  <div class="card sm mu">
+    <b style="color:var(--tx)">Ehrlich vorab</b><br>
+    Alles, was die KI meldet, sind Schätzungen. Personen und Autos werden mit einem kleinen Standardmodell erkannt (Fehler möglich, besonders bei Dunkelheit). Die Geschwindigkeit ist nur grob geschätzt. Wiederkehrende Gesichter bekommen anonyme Namen wie "Person 1". Die Seite sagt nicht, wer jemand ist. Nur auf eigenem Grundstück und mit Wissen der gefilmten Personen verwenden.
+  </div>
+</section>
+
+<!-- CAMERA DEVICE -->
+<section id="camera" class="hide">
+  <h1>Kameragerät</h1>
+  <div class="row" style="margin-bottom:8px"><span class="pill" id="camStatus">Bereit</span><span class="pill" id="camLink"></span></div>
+  <div class="camview"><video id="camVideo" autoplay playsinline muted></video></div>
+  <div class="card" style="margin-top:12px">
+    <button class="btn" id="camStart">Kamera starten und verbinden</button>
+    <div class="row"><button class="btn sec sm" id="camFlip">Kamera wechseln</button><button class="btn bad sm" id="camStop">Beenden</button></div>
+    <p class="sm mu" id="camMsg">Tippe auf Start, erlaube die Kamera. Danach das Gerät hinstellen und Bildschirm anlassen.</p>
+  </div>
+</section>
+
+<!-- CONTROL -->
+<section id="control" class="hide">
+  <div class="row" style="justify-content:space-between"><h1 id="ctrlTitle">Kontrollgerät</h1><div class="row"><span class="pill" id="aiStatus">KI: aus</span><span class="pill" id="netStatus"></span></div></div>
+  <div class="layout">
+    <div>
+      <div class="grid cams" id="camGrid"></div>
+      <div class="card hide" id="emptyCams"><b>Noch keine Kamera verbunden.</b><div class="sm mu">Scanne den QR-Code unten mit dem zweiten Gerät, oder starte die Kamera dieses Geräts.</div></div>
+    </div>
+    <div>
+      <div class="card" id="pairCard">
+        <h2>Kamerageräte verbinden</h2>
+        <div class="qrbox" id="qr"></div>
+        <div class="code" id="codeTxt"></div>
+        <div class="sm mu" style="text-align:center">Auf dem Kameragerät: QR mit der Kamera-App scannen und den Link öffnen. Oder die Seite öffnen, "Beitreten" und diesen Code eingeben.</div>
+        <div class="sm mu" id="linkTxt" style="word-break:break-all;margin-top:6px"></div>
+        <div class="row" style="margin-top:8px"><button class="btn sec sm" id="copyLink">Link kopieren</button><button class="btn sec sm" id="localCam">Kamera dieses Geräts hinzufügen</button></div>
+      </div>
+      <div class="card"><h2>Zähler (alle Kameras)</h2>
+        <div class="stats">
+          <div class="stat"><b id="stPersNow">0</b><span>Personen jetzt</span></div>
+          <div class="stat"><b id="stPersTot">0</b><span>Personen gesamt*</span></div>
+          <div class="stat"><b id="stCars">0</b><span>Fahrzeuge gezählt*</span></div>
+          <div class="stat"><b id="stFaces">0</b><span>Versch. Gesichter*</span></div>
+        </div>
+        <div class="sm mu" style="margin-top:6px">* Schätzung. Eine Person, die oft ins Bild kommt, kann mehrfach gezählt werden.</div>
+        <div class="sm" style="margin-top:6px" id="speedLine">Letzte Geschwindigkeit: -</div>
+      </div>
+    </div>
+  </div>
+  <div class="two">
+    <div class="card"><h2>Ereignisse</h2><div class="log" id="log"><div class="mu">Noch nichts erkannt.</div></div></div>
+    <div class="card"><h2>Wiederkehrende Gesichter (anonym)</h2><div class="faces" id="faces"><span class="mu sm">Noch keine.</span></div>
+      <button class="btn sec sm" id="wipeFaces" style="margin-top:8px">Gesichtsdaten löschen</button></div>
+  </div>
+  <div class="card"><h2>Einstellungen</h2>
+    <label class="sw"><span>Bewegung erkennen</span><input type="checkbox" id="fMotion" checked></label>
+    <label class="sw" style="display:block"><span>Bewegungs-Empfindlichkeit: <b id="sensVal">8</b>/10 (10 = extrem)</span><input type="range" id="sens" min="1" max="10" value="8" style="width:100%;height:30px"></label>
+    <label class="sw"><span>Bei Alarm: Kamera groß in die Mitte (6 s)</span><input type="checkbox" id="fZoom" checked></label>
+    <label class="sw"><span>Alarmton und Vibration</span><input type="checkbox" id="fSound"></label>
+    <label class="sw"><span>Herumlungern: Alarm nach (Sekunden)</span><input type="text" id="loiter" value="20" style="width:90px;font-size:16px;letter-spacing:0;text-transform:none"></label>
+    <label class="sw"><span>Tiere erkennen (Hund, Katze, Vogel ...)</span><input type="checkbox" id="fAnimal" checked></label>
+    <label class="sw"><span>Personen und Fahrzeuge erkennen</span><input type="checkbox" id="fObj" checked></label>
+    <label class="sw"><span>Wiederkehrende Gesichter erkennen</span><input type="checkbox" id="fFace" checked></label>
+    <label class="sw"><span>Auto-Länge im Bild für Tempo-Schätzung (m)</span><input type="text" id="carLen" value="4.2" style="width:90px;font-size:16px;letter-spacing:0;text-transform:none"></label>
+    <div class="sm mu" style="margin-top:6px">Tempo: Strecke im Bild pro Sekunde, umgerechnet mit der angenommenen Fahrzeuglänge. Funktioniert nur grob bei Fahrzeugen, die quer durchs Bild fahren, Fehler von 30 bis 50 % sind normal. Fährt ein Auto direkt auf die Kamera zu, gibt es keinen Wert.</div>
+    <button class="btn bad sm" id="stopAll" style="margin-top:8px">Beenden und zurück</button>
+  </div>
+  <div class="sm mu" id="techInfo"></div>
+</section>
+</div>
+
+<div id="backdrop" class="hide"></div>
+<script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.13/dist/face-api.js"></script>
+<script>window.tf = window.faceapi && faceapi.tf;</script>
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.3/dist/coco-ssd.min.js"></script>
+<script>
+(function(){
+'use strict';
+const $=id=>document.getElementById(id);
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+const show=id=>{['home','camera','control'].forEach(x=>$(x).classList.toggle('hide',x!==id))};
+const fmtT=t=>new Date(t).toLocaleTimeString('de-DE');
+const secure=window.isSecureContext;
+if(secure)$('fileWarn').classList.add('hide');
+const PEER_OPTS={debug:0}; // PeerJS Cloud (0.peerjs.com) nur fuer den Verbindungsaufbau, Video laeuft per WebRTC direkt
+const ID_PREFIX='sw-';
+const rid=()=>Array.from({length:6},()=>'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'[Math.floor(Math.random()*32)]).join('');
+
+/* ===================== CAMERA DEVICE ===================== */
+let camStream=null,camPeer=null,camCall=null,camFacing='environment',camTarget=null,wake=null;
+async function getCam(){
+  return navigator.mediaDevices.getUserMedia({audio:false,video:{facingMode:{ideal:camFacing},width:{ideal:1280},height:{ideal:720},frameRate:{ideal:15,max:20}}});
+}
+function setCamStatus(t,cls){const e=$('camStatus');e.textContent=t;e.className='pill '+(cls||'')}
+async function startCameraDevice(code){
+  camTarget=ID_PREFIX+code.toUpperCase().trim();
+  show('camera');
+  $('camLink').textContent='Code '+code.toUpperCase();
+  $('camStart').onclick=connectCam;
+  $('camFlip').onclick=async()=>{camFacing=camFacing==='environment'?'user':'environment';if(!camStream)return;try{const ns=await getCam();const nt=ns.getVideoTracks()[0];if(camCall&&camCall.peerConnection){const s=camCall.peerConnection.getSenders().find(x=>x.track&&x.track.kind==='video');if(s)await s.replaceTrack(nt)}camStream.getTracks().forEach(t=>t.stop());camStream=ns;$('camVideo').srcObject=ns}catch(e){$('camMsg').textContent='Wechsel nicht möglich: '+e.message}};
+  $('camStop').onclick=()=>{stopCam();location.hash='';location.reload()};
+  if(!secure){setCamStatus('Kein https','err');$('camMsg').textContent='Kamera geht nur über https. Bitte die gehostete Seite verwenden.'}
+}
+async function connectCam(){
+  $('camStart').disabled=true;setCamStatus('Kamera wird gestartet...','warn');
+  try{camStream=await getCam()}catch(e){setCamStatus('Keine Kamera','err');$('camMsg').textContent='Kamerazugriff nicht möglich ('+(e.name||e.message)+'). Erlaube die Kamera in den Browser-Einstellungen und tippe erneut.';$('camStart').disabled=false;return}
+  $('camVideo').srcObject=camStream;
+  try{wake=await navigator.wakeLock.request('screen')}catch(e){}
+  setCamStatus('Verbinde...','warn');
+  camPeer=new Peer(PEER_OPTS);
+  camPeer.on('error',e=>{
+    if(e.type==='peer-unavailable'){setCamStatus('Kontrollgerät nicht gefunden','err');$('camMsg').textContent='Das Kontrollgerät mit diesem Code ist nicht online. Dort die Seite offen lassen, Code prüfen und erneut tippen.';$('camStart').disabled=false}
+    else{setCamStatus('Fehler: '+e.type,'err');$('camMsg').textContent='Verbindung zum Vermittlungsserver fehlgeschlagen ('+e.type+'). Internet prüfen.';$('camStart').disabled=false}
+  });
+  camPeer.on('open',()=>{
+    const name='Kamera '+(camPeer.id||'').slice(-3).toUpperCase();
+    camCall=camPeer.call(camTarget,camStream,{metadata:{name}});
+    if(!camCall){setCamStatus('Fehler','err');return}
+    camCall.on('close',()=>{setCamStatus('Getrennt (oder schon 4 Kameras verbunden)','err')});
+    camCall.on('error',e=>{setCamStatus('Fehler','err');$('camMsg').textContent=String(e)});
+    const pc=camCall.peerConnection;
+    const upd=()=>{const s=pc.iceConnectionState;if(s==='connected'||s==='completed'){setCamStatus('Verbunden, sendet Video','ok');$('camMsg').textContent='Läuft. Gerät hinstellen, Bildschirm anlassen.'}else if(s==='failed'){setCamStatus('Verbindung fehlgeschlagen','err');$('camMsg').textContent='Direkte Verbindung nicht möglich (Netzwerk blockiert?). Beide Geräte ins selbe WLAN und erneut versuchen.'}else if(s==='disconnected'){setCamStatus('Unterbrochen...','warn')}else setCamStatus('Verbinde...','warn')};
+    pc.addEventListener('iceconnectionstatechange',upd);upd();
+    setTimeout(()=>{const s=pc.iceConnectionState;if(s!=='connected'&&s!=='completed'){setCamStatus('Kontrollgerät antwortet nicht','err');$('camMsg').textContent='Keine Antwort. Ist die Kontrollseite offen? Zur Not im selben WLAN erneut versuchen.';$('camStart').disabled=false}},20000);
+  });
+  camPeer.on('disconnected',()=>{try{camPeer.reconnect()}catch(e){}});
+}
+function stopCam(){try{camCall&&camCall.close()}catch(e){}try{camPeer&&camPeer.destroy()}catch(e){}if(camStream)camStream.getTracks().forEach(t=>t.stop());try{wake&&wake.release()}catch(e){}}
+
+/* ===================== CONTROL DEVICE ===================== */
+const MAXCAM=4;const sources=new Map();let ctrlPeer=null,ctrlId=null,srcCount=0,analysisStarted=false;
+const feat={motion:true,obj:true,face:true,animal:true,sound:false,zoom:true,sens:8};
+const stats={persTot:0,cars:0,animals:0,lastSpeed:null};
+const logs=[];
+const gallery=[];let faceN=0;
+const models={coco:null,face:false,state:'aus'};
+
+function setAI(t,c){const e=$('aiStatus');e.textContent='KI: '+t;e.className='pill '+(c||'')}
+function setNet(t,c){const e=$('netStatus');e.classList.toggle('hide',!t);e.textContent=t;e.className='pill '+(c||'')}
+
+function startControl(single){
+  show('control');
+  $('ctrlTitle').textContent=single?'Einzelgerät':'Kontrollgerät';
+  $('pairCard').classList.toggle('hide',!!single);
+  if(single){$('techInfo').textContent='Einzelgerät-Modus: nichts wird übertragen, das Video bleibt auf diesem Gerät.';addLocalCam();startAnalysis();return}
+  let code=sessionStorage.getItem('sw_code')||rid();sessionStorage.setItem('sw_code',code);
+  openCtrlPeer(code);
+  startAnalysis();
+  updateEmpty();
+}
+function openCtrlPeer(code){
+  ctrlId=ID_PREFIX+code;setNet('Verbinde...','warn');
+  ctrlPeer=new Peer(ctrlId,PEER_OPTS);
+  ctrlPeer.on('open',()=>{
+    setNet('Bereit für Kameras','ok');
+    const base=location.href.split('#')[0];
+    const url=base+'#join='+code;
+    $('codeTxt').textContent=code;$('linkTxt').textContent=url;
+    try{const q=qrcode(0,'M');q.addData(url);q.make();$('qr').innerHTML=q.createSvgTag({cellSize:4,margin:0,scalable:true})}catch(e){$('qr').textContent='QR-Fehler'}
+    $('copyLink').onclick=()=>{navigator.clipboard&&navigator.clipboard.writeText(url).then(()=>{$('copyLink').textContent='Kopiert'}).catch(()=>{})};
+    $('techInfo').textContent='Verbindung: WebRTC direkt zwischen den Geräten. Vermittlung beim Aufbau: öffentlicher PeerJS-Cloud-Server (0.peerjs.com), STUN: Google (stun.l.google.com). Kein eigener Server, kein Konto.';
+  });
+  ctrlPeer.on('call',call=>{
+    if(!sources.has(call.peer)&&[...sources.values()].filter(x=>x.kind==='remote').length+(sources.has('local')?1:0)>=MAXCAM){call.close();addLog(null,'info','Kamera abgelehnt: schon '+MAXCAM+' Kameras verbunden');return}
+    call.answer();
+    call.on('stream',stream=>addRemote(call,stream));
+    call.on('close',()=>dropSource(call.peer));
+    call.on('error',()=>dropSource(call.peer));
+    const pc=call.peerConnection;
+    if(pc)pc.addEventListener('iceconnectionstatechange',()=>{const s=pc.iceConnectionState;const src=sources.get(call.peer);if(!src)return;if(s==='disconnected'||s==='failed'||s==='closed'){src.status.textContent='getrennt';setTimeout(()=>{if(pc.iceConnectionState!=='connected'&&pc.iceConnectionState!=='completed')dropSource(call.peer)},8000)}else if(s==='connected'||s==='completed'){src.status.textContent='live'}});
+  });
+  ctrlPeer.on('error',e=>{
+    if(e.type==='unavailable-id'){sessionStorage.removeItem('sw_code');const c=rid();sessionStorage.setItem('sw_code',c);openCtrlPeer(c)}
+    else setNet('Netzfehler: '+e.type,'err');
+  });
+  ctrlPeer.on('disconnected',()=>{setNet('Getrennt, verbinde neu...','warn');try{ctrlPeer.reconnect()}catch(e){}});
+}
+function makeTile(id,name,kind){
+  const t=document.createElement('div');t.className='tile';
+  t.innerHTML='<div class="vw"><video autoplay playsinline muted></video><canvas></canvas></div><div class="bar"><i></i></div><div class="cap"><b></b><span class="st"></span><span class="info mu"></span></div><div class="cap" style="padding-top:0"><button class="btn sec sm zbtn">Zone zeichnen</button><button class="btn sec sm zclr hide">Zone löschen</button><span class="mu zhint"></span></div>';
+  t.querySelector('b').textContent=name;
+  const slot=document.createElement('div');slot.className='slot';slot.appendChild(t);$('camGrid').appendChild(slot);
+  const s={id,name,kind,tile:t,video:t.querySelector('video'),canvas:t.querySelector('canvas'),bar:t.querySelector('.bar i'),status:t.querySelector('.st'),info:t.querySelector('.info'),
+    slot,tracks:[],nextId:1,prev:null,lastMotion:0,motionPct:0,motionBox:null,lastFace:0,faces:[],persNow:0,mc:document.createElement('canvas'),lastObj:0,ended:[]};
+  s.mc.width=64;s.mc.height=48;s.status.textContent='verbinde';s.zone=null;s.drawing=false;
+  const zb=t.querySelector('.zbtn'),zc=t.querySelector('.zclr'),zh=t.querySelector('.zhint'),cv=s.canvas;
+  zb.onclick=()=>{s.drawing=!s.drawing;zb.textContent=s.drawing?'Abbrechen':'Zone zeichnen';zh.textContent=s.drawing?'Mit dem Finger ein Rechteck ins Bild ziehen':'';cv.style.touchAction=s.drawing?'none':'';cv.style.pointerEvents=s.drawing?'auto':'none'};
+  zc.onclick=()=>{s.zone=null;zc.classList.add('hide');zh.textContent='Zone gelöscht'};
+  let st=null;const pos=e=>{const r=cv.getBoundingClientRect();return [Math.min(1,Math.max(0,(e.clientX-r.left)/r.width)),Math.min(1,Math.max(0,(e.clientY-r.top)/r.height))]};
+  cv.style.pointerEvents='none';
+  t.querySelector('.vw').addEventListener('click',()=>{if(s.drawing)return;if(spotSrc===s)unspot();else spot(s,true)});
+  cv.addEventListener('pointerdown',e=>{if(!s.drawing)return;st=pos(e);s.zone=[st[0],st[1],0,0];cv.setPointerCapture(e.pointerId)});
+  cv.addEventListener('pointermove',e=>{if(!s.drawing||!st)return;const p=pos(e);s.zone=[Math.min(st[0],p[0]),Math.min(st[1],p[1]),Math.abs(p[0]-st[0]),Math.abs(p[1]-st[1])]});
+  cv.addEventListener('pointerup',()=>{if(!s.drawing||!st)return;st=null;s.drawing=false;zb.textContent='Zone zeichnen';cv.style.pointerEvents='none';if(s.zone&&s.zone[2]>0.03&&s.zone[3]>0.03){zc.classList.remove('hide');zh.textContent='Zone aktiv: Alarm nur hier';addLog(s,'info','Zone festgelegt')}else{s.zone=null;zh.textContent='Zu klein, nochmal'}});
+  sources.set(id,s);updateEmpty();return s;
+}
+function addRemote(call,stream){
+  if(sources.has(call.peer)){const s=sources.get(call.peer);if(s.video.srcObject!==stream){s.video.srcObject=stream}return}
+  const name=(call.metadata&&call.metadata.name)||('Kamera '+(++srcCount));
+  const s=makeTile(call.peer,name,'remote');s.call=call;
+  s.video.srcObject=stream;s.video.play().catch(()=>{});s.status.textContent='live';
+  addLog(s,'info','Kamera verbunden: '+name);
+}
+async function addLocalCam(){
+  if(sources.has('local'))return;
+  if(sources.size>=MAXCAM){alert('Maximal '+MAXCAM+' Kameras');return}
+  try{
+    const stream=await navigator.mediaDevices.getUserMedia({audio:false,video:{facingMode:{ideal:'environment'},width:{ideal:1280},height:{ideal:720},frameRate:{ideal:15,max:20}}});
+    const s=makeTile('local','Dieses Gerät','local');s.stream=stream;s.video.srcObject=stream;s.video.play().catch(()=>{});s.status.textContent='live';
+    addLog(s,'info','Lokale Kamera gestartet');
+  }catch(e){alert('Kamera nicht verfügbar: '+(e.name||e.message)+(secure?'':'\n(Seite nicht über https)'))}
+}
+function dropSource(id){
+  const s=sources.get(id);if(!s)return;
+  addLog(s,'info','Kamera getrennt: '+s.name);
+  if(s.stream)s.stream.getTracks().forEach(t=>t.stop());
+  if(spotSrc===s)unspot();s.slot.remove();sources.delete(id);updateEmpty();
+}
+let spotSrc=null,spotTimer=null,spotLast=0;
+function unspot(){if(!spotSrc)return;const s=spotSrc;spotSrc=null;clearTimeout(spotTimer);s.tile.classList.remove('spot','manual');s.slot.style.height='';$('backdrop').classList.add('hide')}
+function spot(s,manual){
+  if(spotSrc&&spotSrc!==s){if(spotSrc.manualSpot)return;unspot()}
+  if(!spotSrc){s.slot.style.height=s.slot.offsetHeight+'px';s.tile.classList.add('spot');$('backdrop').classList.remove('hide')}
+  spotSrc=s;s.manualSpot=!!manual;s.tile.classList.toggle('manual',!!manual);
+  clearTimeout(spotTimer);if(!manual)spotTimer=setTimeout(unspot,6000);
+}
+function alarmSpot(s){if(!feat.zoom||sources.size<2||!s)return;spot(s,false)}
+function updateEmpty(){$('camGrid').dataset.n=Math.min(4,sources.size);$('emptyCams').classList.toggle('hide',sources.size>0)}
+
+/* ---------- log ---------- */
+function snap(s,box,pad){
+  try{const v=s.video;const c=document.createElement('canvas');c.width=96;c.height=96;const g=c.getContext('2d');
+    let [x,y,w,h]=box;const m=Math.max(w,h)*(pad||0.1);x-=m;y-=m;w+=2*m;h+=2*m;const sz=Math.max(w,h);const cx=x+w/2,cy=y+h/2;
+    g.drawImage(v,Math.max(0,cx-sz/2),Math.max(0,cy-sz/2),sz,sz,0,0,96,96);return c.toDataURL('image/jpeg',.6)}catch(e){return null}
+}
+function addLog(s,kind,text,img){
+  if(s&&(kind==='motion'||kind==='zone'||kind==='loiter'))alarmSpot(s);
+  logs.unshift({t:Date.now(),cam:s?s.name:'',kind,text,img});if(logs.length>80)logs.pop();renderLog();
+}
+let actx=null,lastBeep=0;
+function alarm(){if(!feat.sound)return;const n=Date.now();if(n-lastBeep<3000)return;lastBeep=n;try{actx=actx||new (window.AudioContext||window.webkitAudioContext)();const o=actx.createOscillator(),g=actx.createGain();o.frequency.value=880;g.gain.value=.15;o.connect(g);g.connect(actx.destination);o.start();o.stop(actx.currentTime+.25)}catch(e){}try{navigator.vibrate&&navigator.vibrate(200)}catch(e){}}
+function fullSnap(s){try{const c=document.createElement('canvas');c.width=160;c.height=Math.round(160*s.video.videoHeight/s.video.videoWidth)||90;c.getContext('2d').drawImage(s.video,0,0,c.width,c.height);return c.toDataURL('image/jpeg',.6)}catch(e){return null}}
+const inZone=(s,b)=>{if(!s.zone)return true;const W=s.video.videoWidth,H=s.video.videoHeight;const cx=(b[0]+b[2]/2)/W,cy=(b[1]+b[3]/2)/H,z=s.zone;return cx>=z[0]&&cx<=z[0]+z[2]&&cy>=z[1]&&cy<=z[1]+z[3]};
+function renderLog(){
+  const el=$('log');if(!logs.length)return;el.innerHTML='';
+  logs.slice(0,40).forEach(l=>{const d=document.createElement('div');if(l.img){const i=document.createElement('img');i.src=l.img;d.appendChild(i)}
+    const tm=document.createElement('time');tm.textContent=fmtT(l.t);d.appendChild(tm);const sp=document.createElement('span');sp.textContent=(l.cam?l.cam+': ':'')+l.text;d.appendChild(sp);el.appendChild(d)});
+}
+
+/* ---------- AI loading ---------- */
+async function loadModels(){
+  if(models.state!=='aus')return;models.state='laden';setAI('lädt Modelle...','warn');
+  try{
+    try{await tf.setBackend('webgl')}catch(e){await tf.setBackend('cpu')}await tf.ready();
+    const tasks=[];
+    tasks.push(cocoSsd.load({base:'lite_mobilenet_v2'}).then(m=>{models.coco=m}));
+    const MU='https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.13/model/';
+    tasks.push(Promise.all([faceapi.nets.tinyFaceDetector.loadFromUri(MU),faceapi.nets.faceLandmark68TinyNet.loadFromUri(MU),faceapi.nets.faceRecognitionNet.loadFromUri(MU)]).then(()=>{models.face=true}));
+    await Promise.all(tasks.map(p=>p.catch(e=>{console.warn(e)})));
+    models.state='bereit';
+    if(!models.coco&&!models.face)setAI('Modelle nicht ladbar','err');
+    else setAI('an ('+tf.getBackend()+(models.coco?'':', ohne Objekte')+(models.face?'':', ohne Gesichter')+')','ok');
+  }catch(e){models.state='fehler';setAI('Fehler: '+(e.message||e),'err');console.error(e)}
+}
+function startAnalysis(){if(analysisStarted)return;analysisStarted=true;loadModels();loop()}
+
+/* ---------- analysis ---------- */
+const VEH={car:'Auto',truck:'Lkw',bus:'Bus',motorcycle:'Motorrad'};
+const ANI={dog:'Hund',cat:'Katze',bird:'Vogel',horse:'Pferd',cow:'Kuh',sheep:'Schaf',bear:'Bär'};
+const REAL={Auto:()=>parseFloat(String($('carLen').value).replace(',','.'))||4.2,Lkw:()=>7.5,Bus:()=>11,Motorrad:()=>2.0};
+function motion(s,now){
+  if(now-s.lastMotion<250)return;s.lastMotion=now;
+  const v=s.video;if(!v.videoWidth)return;const g=s.mc.getContext('2d',{willReadFrequently:true});g.drawImage(v,0,0,64,48);
+  const d=g.getImageData(0,0,64,48).data;const cur=new Uint8Array(64*48);
+  const k=feat.sens;const pt=Math.round(40-k*3.2);        /* Pixel-Schwelle 37..8 */
+  const areaMin=Math.max(0.15,3.2-k*0.3);                  /* Mindestflaeche in % */
+  const z=s.zone;let ch=0,tot=0,x0=64,y0=48,x1=0,y1=0;
+  for(let i=0;i<cur.length;i++){const l=(d[i*4]*77+d[i*4+1]*150+d[i*4+2]*29)>>8;cur[i]=l;
+    const x=i%64,y=(i/64)|0;if(z&&!(x/64>=z[0]&&x/64<=z[0]+z[2]&&y/48>=z[1]&&y/48<=z[1]+z[3]))continue;tot++;
+    if(s.prev&&Math.abs(l-s.prev[i])>pt){ch++;if(x<x0)x0=x;if(x>x1)x1=x;if(y<y0)y0=y;if(y>y1)y1=y}}
+  const pct=s.prev&&tot?ch/tot*100:0;s.prev=cur;s.motionPct=s.motionPct*0.4+pct*0.6;
+  const on=pct>areaMin&&x1>=x0;
+  s.motionBox=on?[x0/64,y0/48,(x1-x0+1)/64,(y1-y0+1)/48]:null;
+  s.bar.style.width=Math.min(100,s.motionPct*10)+'%';
+  if(on){s.motionUntil=now+800;if(now-(s.lastMotionLog||0)>8000){s.lastMotionLog=now;addLog(s,'motion',(z?'Zonenalarm: Bewegung in der Zone':'Bewegung erkannt')+' ('+pct.toFixed(1)+' %)',fullSnap(s));alarm()}}
+}
+function iou(a,b){const x1=Math.max(a[0],b[0]),y1=Math.max(a[1],b[1]),x2=Math.min(a[0]+a[2],b[0]+b[2]),y2=Math.min(a[1]+a[3],b[1]+b[3]);const i=Math.max(0,x2-x1)*Math.max(0,y2-y1);return i/(a[2]*a[3]+b[2]*b[3]-i+1e-6)}
+function track(s,dets,now){
+  const W=s.video.videoWidth;const used=new Set();
+  for(const d of dets){
+    const cx=d.box[0]+d.box[2]/2,cy=d.box[1]+d.box[3]/2;let best=null,bc=1e9;
+    for(const t of s.tracks){if(used.has(t)||t.group!==d.group)continue;
+      const dist=Math.hypot(cx-t.cx,cy-t.cy)/W;const ov=iou(d.box,t.box);const c=dist-ov*0.3;
+      if((dist<0.22||ov>0.15)&&c<bc){bc=c;best=t}}
+    if(best){used.add(best);best.box=d.box;best.cx=cx;best.cy=cy;best.last=now;best.hits++;best.label=d.label;best.score=d.score;best.hist.push({t:now,x:cx,y:cy,w:d.box[2]});if(best.hist.length>14)best.hist.shift();
+      if(best.group==='veh')estSpeed(best,W)}
+    else{const t={id:s.nextId++,group:d.group,label:d.label,box:d.box,cx,cy,first:now,last:now,hits:1,counted:false,score:d.score,hist:[{t:now,x:cx,y:cy,w:d.box[2]}],speed:null,maxSpeed:0};s.tracks.push(t);used.add(t)}
+  }
+  for(const t of s.tracks){
+    if(!t.counted&&t.hits>=3){t.counted=true;
+      if(t.group==='person'){stats.persTot++;addLog(s,'person','Person erkannt',snap(s,t.box))}
+      else if(t.group==='animal'){stats.animals++;addLog(s,'animal',t.label+' erkannt (Tier, nicht Mensch)',snap(s,t.box))}
+      else{stats.cars++;t.num=stats.cars;addLog(s,'veh',t.label+' erkannt (Nr. '+t.num+')',snap(s,t.box))}
+    if(t.counted&&s.zone&&!t.zoneHit&&inZone(s,t.box)){t.zoneHit=true;addLog(s,'zone','Zonenalarm: '+t.label+' in der Zone',snap(s,t.box));alarm()}}
+    if(t.group==='person'&&t.counted&&!t.loitered){const lim=parseFloat(String($('loiter').value).replace(',','.'))||20;if((now-t.first)/1000>lim){const sp=Math.hypot(t.cx-t.hist[0].x,t.cy-t.hist[0].y)/s.video.videoWidth;t.loitered=true;addLog(s,'loiter','Herumlungern: Person seit über '+Math.round(lim)+' s im Bild',snap(s,t.box));alarm()}}
+  }
+  s.tracks=s.tracks.filter(t=>{if(now-t.last>2000){
+      if(t.group==='veh'&&t.counted){if(t.maxSpeed>0){stats.lastSpeed=t.label+' Nr. '+t.num+': ca. '+Math.round(t.speed||t.maxSpeed)+' km/h';addLog(s,'speed',t.label+' Nr. '+t.num+' fuhr ca. '+Math.round(t.speed||t.maxSpeed)+' km/h (grobe Schätzung)')}
+      }return false}return true});
+  s.persNow=s.tracks.filter(t=>t.group==='person'&&t.hits>=2&&now-t.last<1200).length;
+}
+function estSpeed(t,W){
+  const h=t.hist;if(h.length<4)return;const a=h[0],b=h[h.length-1];const dt=(b.t-a.t)/1000;if(dt<0.8)return;
+  const dx=b.x-a.x,dy=b.y-a.y;if(Math.abs(dx)<0.03*W||Math.abs(dx)<1.5*Math.abs(dy))return;
+  const mw=h.reduce((s,p)=>s+p.w,0)/h.length;const real=(REAL[t.label]||REAL.Auto)();
+  const kmh=Math.abs(dx)/dt*(real/mw)*3.6;if(!isFinite(kmh)||kmh>200)return;
+  t.speed=t.speed==null?kmh:t.speed*0.6+kmh*0.4;t.maxSpeed=Math.max(t.maxSpeed,t.speed);
+}
+async function objects(s,now){
+  if(!models.coco||!feat.obj)return;
+  const preds=await models.coco.detect(s.video,20,0.45);
+  const dets=[];
+  for(const p of preds){if(p.class==='person')dets.push({group:'person',label:'Person',box:p.bbox,score:p.score});else if(VEH[p.class])dets.push({group:'veh',label:VEH[p.class],box:p.bbox,score:p.score});else if(feat.animal&&ANI[p.class])dets.push({group:'animal',label:ANI[p.class],box:p.bbox,score:p.score})}
+  track(s,dets,now);
+}
+function matchFace(desc){
+  let best=null,bd=1;for(const g of gallery){for(const d of g.descs){const e=faceapi.euclideanDistance(desc,d);if(e<bd){bd=e;best=g}}}
+  return bd<0.56?{g:best,d:bd}:null;
+}
+async function faces(s,now){
+  if(!models.face||!feat.face)return;if(now-s.lastFace<1500)return;s.lastFace=now;
+  const res=await faceapi.detectAllFaces(s.video,new faceapi.TinyFaceDetectorOptions({inputSize:320,scoreThreshold:0.5})).withFaceLandmarks(true).withFaceDescriptors();
+  s.faces=[];
+  for(const r of res){
+    const b=r.detection.box;const box=[b.x,b.y,b.width,b.height];let m=matchFace(r.descriptor);let g;
+    if(m){g=m.g;if(now-g.last>30000){g.visits++;const dk0=new Date().toDateString();if(g.dayKey!==dk0){g.dayKey=dk0;g.today=0}g.today++;addLog(s,'face',g.label+' wieder gesehen (heute '+g.today+'x)',snap(s,box,0.3))}g.last=now;g.seen++;const dk=new Date().toDateString();g.days[dk]=g.days[dk]||{};if(g.descs.length<6&&m.d>0.25)g.descs.push(r.descriptor)}
+    else{g={label:'Person '+(++faceN),days:{},descs:[r.descriptor],first:now,last:now,seen:1,visits:1,today:1,dayKey:new Date().toDateString(),img:snap(s,box,0.3)};gallery.push(g);addLog(s,'face','Neues Gesicht: '+g.label,g.img)}
+    s.faces.push({box,label:g.label,t:now});
+  }
+  renderFaces();
+}
+function renderFaces(){
+  const el=$('faces');if(!gallery.length)return;el.innerHTML='';
+  gallery.forEach(g=>{const d=document.createElement('div');d.className='face';const i=document.createElement('img');i.src=g.img||'';d.appendChild(i);const t=document.createElement('div');t.textContent=g.label;d.appendChild(t);const u=document.createElement('div');u.className='mu';u.textContent='heute '+(g.today||0)+'x, gesamt '+g.visits+'x';d.appendChild(u);el.appendChild(d)});
+}
+function draw(s,now){
+  const v=s.video,c=s.canvas;if(!v.videoWidth)return;if(c.width!==v.videoWidth){c.width=v.videoWidth;c.height=v.videoHeight;s.tile.querySelector('.vw').style.aspectRatio=v.videoWidth+'/'+v.videoHeight}
+  const g=c.getContext('2d');g.clearRect(0,0,c.width,c.height);const k=c.width/640;g.lineWidth=2*k;g.font=(14*k)+'px sans-serif';
+  const lab=(txt,x,y,col)=>{const w=g.measureText(txt).width+8*k;g.fillStyle=col;g.fillRect(x,Math.max(0,y-18*k),w,18*k);g.fillStyle='#000';g.fillText(txt,x+4*k,Math.max(14*k,y-4*k))};
+  if(s.zone){const z=s.zone;g.fillStyle='rgba(255,92,108,.12)';g.fillRect(z[0]*c.width,z[1]*c.height,z[2]*c.width,z[3]*c.height);g.strokeStyle='#ff5c6c';g.setLineDash([]);g.strokeRect(z[0]*c.width,z[1]*c.height,z[2]*c.width,z[3]*c.height)}
+  if(s.motionBox&&feat.motion&&Date.now()<(s.motionUntil||0)){const [x,y,w,h]=s.motionBox;g.strokeStyle='#ffb020';g.setLineDash([6*k,4*k]);g.strokeRect(x*c.width,y*c.height,w*c.width,h*c.height);g.setLineDash([])}
+  for(const t of s.tracks){if(t.hits<2||now-t.last>1000)continue;const [x,y,w,h]=t.box;const col=t.group==='person'?'#4aa3ff':t.group==='animal'?'#ffd34a':'#3ddc97';g.strokeStyle=col;g.strokeRect(x,y,w,h);
+    let txt=t.label+(t.group==='veh'&&t.num?' #'+t.num:'');if(t.group==='person'&&t.loitered)txt+=' (lungert)';if(t.group==='veh'&&t.speed)txt+=' ~'+Math.round(t.speed)+' km/h?';lab(txt,x,y,col)}
+  for(const f of s.faces){if(now-f.t>1300)continue;g.strokeStyle='#ff5ccf';g.strokeRect(f.box[0],f.box[1],f.box[2],f.box[3]);lab(f.label,f.box[0],f.box[1],'#ff5ccf')}
+  s.info.textContent=(s.persNow?s.persNow+' Pers. ':'')+(s.tracks.some(t=>t.group==='animal'&&now-t.last<1000)?'Tier ':'')+(s.tracks.filter(t=>t.group==='veh'&&now-t.last<1000).length?'Fahrzeug ':'')+(s.motionPct>1?'Bewegung':'');
+}
+function updateStats(){
+  let n=0;sources.forEach(s=>n+=s.persNow);$('stPersNow').textContent=n;$('stPersTot').textContent=stats.persTot;$('stCars').textContent=stats.cars;$('stFaces').textContent=gallery.length;
+  $('speedLine').textContent='Letzte Geschwindigkeit: '+(stats.lastSpeed?stats.lastSpeed+' (grobe Schätzung, Fehler 30 bis 50 %)':'-');
+}
+async function loop(){
+  for(;;){
+    const list=[...sources.values()].filter(s=>s.video.readyState>=2&&s.video.videoWidth);
+    if(!list.length){await sleep(300);continue}
+    for(const s of list){
+      const now=Date.now();
+      try{if(feat.motion)motion(s,now);else{s.motionBox=null;s.motionPct=0;s.bar.style.width='0'}
+        if(models.state==='bereit'){await objects(s,Date.now());await faces(s,Date.now())}
+      }catch(e){console.warn('analyse',e)}
+      draw(s,Date.now());
+    }
+    updateStats();
+    await sleep(40);
+  }
+}
+
+/* ---------- wiring ---------- */
+$('bControl').onclick=()=>startControl(false);
+$('bSingle').onclick=()=>startControl(true);
+$('bJoin').onclick=()=>{const c=$('joinCode').value.trim();if(c)startCameraDevice(c)};
+$('localCam').onclick=()=>addLocalCam();
+$('fMotion').onchange=e=>feat.motion=e.target.checked;
+$('sens').oninput=e=>{feat.sens=+e.target.value;$('sensVal').textContent=e.target.value};
+$('fSound').onchange=e=>{feat.sound=e.target.checked;if(feat.sound)alarm()};
+$('fZoom').onchange=e=>feat.zoom=e.target.checked;
+$('backdrop').onclick=()=>unspot();
+$('fAnimal').onchange=e=>feat.animal=e.target.checked;
+$('fObj').onchange=e=>feat.obj=e.target.checked;
+$('fFace').onchange=e=>{feat.face=e.target.checked};
+$('wipeFaces').onclick=()=>{gallery.length=0;faceN=0;$('faces').innerHTML='<span class="mu sm">Gelöscht.</span>';sources.forEach(s=>s.faces=[])};
+$('stopAll').onclick=()=>{try{ctrlPeer&&ctrlPeer.destroy()}catch(e){}sources.forEach(s=>s.stream&&s.stream.getTracks().forEach(t=>t.stop()));sessionStorage.removeItem('sw_code');location.hash='';location.reload()};
+const m=location.hash.match(/join=([A-Za-z0-9]+)/);
+if(m){startCameraDevice(m[1])}
+window.__sw={sources,gallery,stats,models,logs,feat};
+})();
+</script>
+</body>
+</html>
