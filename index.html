@@ -8,8 +8,8 @@
 <style>
 :root{--bg:#0b1118;--card:#141c26;--card2:#1b2532;--line:#263344;--tx:#e8eef6;--mu:#8fa1b6;--ac:#3ddc97;--wa:#ffb020;--er:#ff5c6c;--bl:#4aa3ff}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-html,body{margin:0;background:var(--bg);color:var(--tx);font:16px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
-body{padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);min-height:100vh}
+html{-webkit-text-size-adjust:100%}html,body{margin:0;background:var(--bg);color:var(--tx);font:16px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+body{overflow-wrap:anywhere;padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);min-height:100vh;min-height:100dvh}
 .wrap{max-width:1180px;margin:0 auto;padding:14px}
 h1{font-size:22px;margin:4px 0 2px}h2{font-size:16px;margin:0 0 8px}
 .mu{color:var(--mu)}.sm{font-size:13px}
@@ -206,7 +206,7 @@ const rid=()=>Array.from({length:6},()=>'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'[Math.
 /* ===================== CAMERA DEVICE ===================== */
 let camStream=null,camPeer=null,camCall=null,camFacing='environment',camTarget=null,wake=null;
 async function getCam(){
-  return navigator.mediaDevices.getUserMedia({audio:false,video:{facingMode:{ideal:camFacing},width:{ideal:1280},height:{ideal:720},frameRate:{ideal:15,max:20}}});
+  return navigator.mediaDevices.getUserMedia({audio:false,video:{facingMode:{ideal:camFacing},width:{ideal:960},height:{ideal:540},frameRate:{ideal:15,max:15}}});
 }
 function setCamStatus(t,cls){const e=$('camStatus');e.textContent=t;e.className='pill '+(cls||'')}
 async function startCameraDevice(code){
@@ -216,11 +216,12 @@ async function startCameraDevice(code){
   $('camStart').onclick=connectCam;$('camRetry').onclick=()=>{$('camStart').disabled=true;camTries=0;connectCam()};
   $('camFlip').onclick=async()=>{camFacing=camFacing==='environment'?'user':'environment';if(!camStream)return;try{const ns=await getCam();const nt=ns.getVideoTracks()[0];if(camCall&&camCall.peerConnection){const s=camCall.peerConnection.getSenders().find(x=>x.track&&x.track.kind==='video');if(s)await s.replaceTrack(nt)}camStream.getTracks().forEach(t=>t.stop());camStream=ns;$('camVideo').srcObject=ns}catch(e){$('camMsg').textContent='Wechsel nicht möglich: '+e.message}};
   $('camStop').onclick=()=>{stopCam();location.hash='';location.reload()};
+  $('camDiag').textContent='Bereit. Code '+code.toUpperCase()+'. Tippe auf "Kamera starten und verbinden".';
   if(!secure){setCamStatus('Kein https','err');$('camMsg').textContent='Kamera geht nur über https. Bitte die gehostete Seite verwenden.'}
 }
 let camGen=0,camTries=0,camTimer=null,camName=null;
 async function connectCam(){
-  $('camStart').disabled=true;$('camRetry').classList.add('hide');
+  $('camStart').disabled=true;$('camRetry').classList.add('hide');$('camDiag').textContent='Kamera wird angefragt (Erlaubnis-Dialog bestätigen) ...';
   if(!camStream){
     setCamStatus('Kamera wird gestartet...','warn');
     try{camStream=await getCam()}catch(e){setCamStatus('Keine Kamera','err');$('camMsg').textContent='Kamerazugriff nicht möglich ('+(e.name||e.message)+'). Erlaube die Kamera in den Browser-Einstellungen (Safari: Aa-Symbol, Website-Einstellungen) und tippe erneut.';$('camStart').disabled=false;$('camRetry').classList.remove('hide');return}
@@ -238,6 +239,7 @@ function dial(){
   const retry=why=>{if(camTries>=3)return false;$('camMsg').textContent=why+' Neuer Versuch in 3 Sekunden ...';setCamStatus('Neuer Versuch ...','warn');camTimer=setTimeout(()=>{if(my===camGen)dial()},3000);return true};
   setCamStatus('Verbinde ('+camTries+'/3) ...','warn');$('camMsg').textContent='Verbindung wird aufgebaut ...';diag();
   camPeer=new Peer(PEER_OPTS);
+  setTimeout(()=>{if(my!==camGen||broker==='ok')return;broker='keine Antwort (12 s)';diag();if(!retry('Vermittlungsserver antwortet nicht (Netz blockiert 0.peerjs.com?).'))fail('Server nicht erreichbar','Der Vermittlungsserver 0.peerjs.com antwortet nicht. Möglich: Firmen-/Schul-WLAN oder Werbeblocker blockiert ihn. Mobilnetz oder anderes WLAN probieren, dann "Erneut verbinden".')},12000);
   camPeer.on('error',e=>{if(my!==camGen)return;
     if(e.type==='peer-unavailable'){broker='ok';sig='Code nicht gefunden';diag();if(!retry('Das Kontrollgerät mit diesem Code ist nicht online.'))fail('Kontrollgerät nicht gefunden','Das Kontrollgerät mit diesem Code ist nicht online. Dort die Seite offen lassen und den Bildschirm anlassen (iPad nicht sperren), Code prüfen, dann "Erneut verbinden".')}
     else{broker='Fehler '+e.type;diag();if(!retry('Vermittlungsserver nicht erreichbar ('+e.type+').'))fail('Server nicht erreichbar','Der kostenlose Vermittlungsserver (0.peerjs.com) ist nicht erreichbar ('+e.type+'). Internet prüfen, dann "Erneut verbinden".')}});
@@ -282,6 +284,7 @@ const logs=[];
 const gallery=[];let faceN=0;
 const models={coco:null,face:false,state:'aus'};
 
+const MOBILE=/Android|iPhone|iPad|iPod/.test(navigator.userAgent)||(navigator.maxTouchPoints>1&&/Mac/.test(navigator.userAgent));
 function setAI(t,c){const e=$('aiStatus');e.textContent='KI: '+t;e.className='pill '+(c||'')}
 function setNet(t,c){const e=$('netStatus');e.classList.toggle('hide',!t);e.textContent=t;e.className='pill '+(c||'')}
 
@@ -294,8 +297,8 @@ function startControl(single){
   if(single){$('techInfo').textContent='Einzelgerät-Modus: nichts wird übertragen, das Video bleibt auf diesem Gerät.';addLocalCam();startAnalysis();return}
   let code=sessionStorage.getItem('sw_code')||rid();sessionStorage.setItem('sw_code',code);
   openCtrlPeer(code);
-  startAnalysis();
   updateEmpty();
+  setAI('startet, sobald die erste Kamera da ist','');
 }
 let ctrlCode=null,isSingle=false,ctrlWake=null,brokerTxt='-';
 async function ctrlWakeLock(){try{ctrlWake=await navigator.wakeLock.request('screen')}catch(e){ctrlWake=null}}
@@ -314,6 +317,7 @@ setInterval(()=>{
 },1500);
 function openCtrlPeer(code){
   ctrlId=ID_PREFIX+code;ctrlCode=code;setNet('Verbinde...','warn');brokerTxt='verbinde';
+  setTimeout(()=>{if(ctrlPeer&&!ctrlPeer.open&&!ctrlPeer.destroyed){brokerTxt='keine Antwort von 0.peerjs.com';setNet('Vermittlungsserver nicht erreichbar','err')}},12000);
   try{ctrlPeer&&!ctrlPeer.destroyed&&ctrlPeer.destroy()}catch(e){}
   const me=ctrlPeer=new Peer(ctrlId,PEER_OPTS);
   me.on('open',()=>{
@@ -366,7 +370,7 @@ function makeTile(id,name,kind){
   cv.addEventListener('pointerdown',e=>{if(!s.drawing)return;st=pos(e);s.zone=[st[0],st[1],0,0];cv.setPointerCapture(e.pointerId)});
   cv.addEventListener('pointermove',e=>{if(!s.drawing||!st)return;const p=pos(e);s.zone=[Math.min(st[0],p[0]),Math.min(st[1],p[1]),Math.abs(p[0]-st[0]),Math.abs(p[1]-st[1])]});
   cv.addEventListener('pointerup',()=>{if(!s.drawing||!st)return;st=null;s.justDrew=true;setTimeout(()=>{s.justDrew=false},400);s.drawing=false;zb.textContent='Zone zeichnen';cv.style.pointerEvents='none';if(s.zone&&s.zone[2]>0.03&&s.zone[3]>0.03){zc.classList.remove('hide');zh.textContent='Zone aktiv: Alarm nur hier';addLog(s,'info','Zone festgelegt')}else{s.zone=null;zh.textContent='Zu klein, nochmal'}});
-  sources.set(id,s);updateEmpty();return s;
+  sources.set(id,s);updateEmpty();setTimeout(startAnalysis,400);return s;
 }
 function addRemote(call,stream){
   let s=sources.get(call.peer);
@@ -427,7 +431,7 @@ async function loadModels(){
   try{
     try{await tf.setBackend('webgl')}catch(e){await tf.setBackend('cpu')}await tf.ready();
     const tasks=[];
-    models.base=localStorage.getItem('sw_model')||(tf.getBackend()==='webgl'?'mobilenet_v2':'lite_mobilenet_v2');$('fModel').value=models.base;
+    models.base=localStorage.getItem('sw_model')||((tf.getBackend()==='webgl'&&!MOBILE)?'mobilenet_v2':'lite_mobilenet_v2');$('fModel').value=models.base;
     tasks.push(cocoSsd.load({base:models.base}).then(m=>{models.coco=m}));
     const MU='https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.13/model/';
     tasks.push(Promise.all([faceapi.nets.tinyFaceDetector.loadFromUri(MU),faceapi.nets.faceLandmark68TinyNet.loadFromUri(MU),faceapi.nets.faceRecognitionNet.loadFromUri(MU)]).then(()=>{models.face=true}));
@@ -503,9 +507,13 @@ const cn=c=>VEH[c]||ANI[c]||OTHER[c]||c;
 function wantCls(){const st=new Set();refs.forEach(r=>{if(r.type==='obj')st.add(r.cls)});return st}
 async function objects(s,now){
   if(!models.coco||!feat.obj)return;
-  const t0=performance.now();const preds=await models.coco.detect(s.video,25,0.3);
+  const vw=s.video.videoWidth,vh=s.video.videoHeight,k=Math.min(1,512/vw);
+  if(!s.oc){s.oc=document.createElement('canvas')}
+  s.oc.width=Math.round(vw*k);s.oc.height=Math.round(vh*k);s.oc.getContext('2d').drawImage(s.video,0,0,s.oc.width,s.oc.height);
+  const t0=performance.now();let preds=await models.coco.detect(s.oc,25,0.3);
+  if(k<1)preds=preds.map(p=>({class:p.class,score:p.score,bbox:p.bbox.map(v=>v/k)}));
   const dt=performance.now()-t0;models.ms=models.ms?models.ms*0.7+dt*0.3:dt;models.n=(models.n||0)+1;
-  if(models.base==='mobilenet_v2'&&models.n>=3&&models.ms>900&&!models.switching){models.switching=true;setAI('Gerät zu langsam für das genaue Modell ('+Math.round(models.ms)+' ms), wechsle zum schnellen ...','warn');
+  if(models.base==='mobilenet_v2'&&models.n>=3&&models.ms>(MOBILE?450:900)&&!models.switching){models.switching=true;setAI('Gerät zu langsam für das genaue Modell ('+Math.round(models.ms)+' ms), wechsle zum schnellen ...','warn');
     try{models.coco=await cocoSsd.load({base:'lite_mobilenet_v2'});models.base='lite_mobilenet_v2';models.ms=0;models.n=0;$('fModel').value=models.base;setAI('an ('+tf.getBackend()+', schnelles Modell automatisch gewählt)','ok')}catch(e){}models.switching=false}
   const wc=wantCls();const dets=[];
   for(const p of preds){
@@ -595,9 +603,13 @@ function wantedHit(s,w,box,now){
   addLog(s,'wanted','GESUCHT: '+r.name+' erkannt ('+(w.lvl==='sure'?'sicher':'unsicher')+', Abstand '+w.d.toFixed(2)+'). Treffer heute: '+r.today,snap(s,box,0.4));alarm();renderRefs();
 }
 async function faces(s,now){
-  if(!models.face||!feat.face)return;if(now-s.lastFace<1200)return;s.lastFace=now;
-  const W=s.video.videoWidth;
-  const res=await faceapi.detectAllFaces(s.video,new faceapi.TinyFaceDetectorOptions({inputSize:sources.size>2?320:416,scoreThreshold:0.4})).withFaceLandmarks(true).withFaceDescriptors();
+  if(!models.face||!feat.face)return;if(now-s.lastFace<(MOBILE?2500:1200))return;
+  if(models.coco&&feat.obj&&!(s.tracks.some(t=>t.group==='person'&&now-t.last<4000)))return;
+  s.lastFace=now;
+  const W=s.video.videoWidth;let src=s.video,fk=1;
+  if(MOBILE&&W>640){fk=640/W;if(!s.fc)s.fc=document.createElement('canvas');s.fc.width=640;s.fc.height=Math.round(s.video.videoHeight*fk);s.fc.getContext('2d').drawImage(s.video,0,0,s.fc.width,s.fc.height);src=s.fc}
+  const res0=await faceapi.detectAllFaces(src,new faceapi.TinyFaceDetectorOptions({inputSize:(sources.size>2||MOBILE)?320:416,scoreThreshold:0.4})).withFaceLandmarks(true).withFaceDescriptors();
+  const res=fk===1?res0:res0.map(r=>({descriptor:r.descriptor,detection:{box:{x:r.detection.box.x/fk,y:r.detection.box.y/fk,width:r.detection.box.width/fk,height:r.detection.box.height/fk}}}));
   s.faces=[];
   for(const r of res){
     const b=r.detection.box;const box=[b.x,b.y,b.width,b.height];
