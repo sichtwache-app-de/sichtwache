@@ -102,6 +102,7 @@ select{background:var(--card2);color:var(--tx);border:1px solid var(--line);bord
     <div class="row"><button class="btn sec sm" id="camFlip">Kamera wechseln</button><button class="btn bad sm" id="camStop">Beenden</button></div>
     <button class="btn hide" id="camRetry">Erneut verbinden</button>
     <button class="btn sec hide" id="camMode">Bildmodus versuchen</button>
+    <button class="btn sec hide" id="camVideoMode">Flüssigeres Video versuchen</button>
     <details><summary>Verbindungsdetails</summary><div class="diag" id="camDiag"></div></details>
     <p class="bigmsg" id="camMsg">Tippe einmal auf Start und erlaube die Kamera. Der Rest läuft automatisch. Lass die Kontrollseite auf dem anderen Gerät offen.</p>
   </div>
@@ -210,6 +211,8 @@ const ID_PREFIX='sw-';
 const rid=()=>Array.from({length:6},()=>'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'[Math.floor(Math.random()*32)]).join('');
 
 /* Pairing v2: signaling, data health, then media. No camera access before the Start tap. */
+const IOS=/iPhone|iPad|iPod/.test(navigator.userAgent)||(navigator.maxTouchPoints>1&&/Mac/.test(navigator.userAgent));
+let camPreferVideo=false;
 let camStream=null,camPeer=null,camCall=null,camData=null,camFacing='environment',camTarget=null,wake=null;
 let camGen=0,camTries=0,camTimer=null,camName='Kamera '+(sessionStorage.getItem('sw_camera')||(()=>{const n=rid();sessionStorage.setItem('sw_camera',n);return n})()).slice(0,6),camStarted=false,camBusy=false,camFrameMode=false,camAck=0,camPong=0,camFramePending=0,camFrameSent=0,camFrameCanvas=null,camLastReason='',camBrokerTimer=null;
 const cameraVisible=()=>document.visibilityState==='visible'&&!$('camera').classList.contains('hide');
@@ -233,7 +236,8 @@ async function startCameraDevice(raw){
  if(!/^[A-Z2-9]{6}$/.test(code)){camMessage('Code nicht gültig','Der Code muss sechs Zeichen haben.','Scanne den QR-Code am Kontrollgerät neu.');$('camStart').classList.add('hide');$('camRetry').classList.add('hide');$('camFlip').disabled=true;return}
  camTarget=ID_PREFIX+code;inlineVideo($('camVideo'));
  $('camStart').onclick=connectCam;$('camRetry').onclick=connectCam;
- $('camMode').onclick=()=>{if(camData&&camData.open){camFrameMode=true;camProgress(3,'Bildmodus startet. Er ist langsamer als Video.');camData.send({t:'fallback'})}};
+ $('camVideoMode').onclick=()=>{camPreferVideo=true;camTries=0;dial()};
+ $('camMode').onclick=()=>{if(camData&&camData.open){camPreferVideo=false;camFrameMode=true;camProgress(3,'Bildmodus startet. Er ist langsamer als Video.');camData.send({t:'fallback'})}};
  $('camFlip').onclick=async()=>{if(camBusy)return;camBusy=true;camFacing=camFacing==='environment'?'user':'environment';try{
    // iOS cannot reliably keep both cameras open. Release the old device first.
    if(camStream)camStream.getTracks().forEach(t=>t.stop());camStream=null;
@@ -255,7 +259,7 @@ async function connectCam(){
 function resetCamLinks(){clearTimeout(camTimer);clearTimeout(camBrokerTimer);try{camCall&&camCall.close()}catch(e){}try{camData&&camData.close()}catch(e){}try{camPeer&&camPeer.destroy()}catch(e){}camCall=null;camData=null;camPeer=null}
 function dial(){
  if(!camStarted||!cameraVisible())return;
- const gen=++camGen;resetCamLinks();camTries++;camAck=0;camPong=Date.now();camFrameMode=/frames=1/.test(location.hash);camFramePending=0;camFrameSent=0;
+ const gen=++camGen;resetCamLinks();camTries++;camAck=0;camPong=Date.now();camFrameMode=/frames=1/.test(location.hash)||(IOS&&!camPreferVideo);camFramePending=0;camFrameSent=0;
  const cands={};let phase='Server wird gesucht',lastError='';
  const diag=()=>{$('camDiag').textContent='Version 2.0 · Versuch '+camTries+'/2 · '+phase+' · Wege: '+candTxt(cands)+(lastError?' · '+lastError:'')};
  const current=()=>gen===camGen&&camStarted;
@@ -278,8 +282,9 @@ function dial(){
    dc.on('open',()=>{if(!current())return;phase='Datenweg offen';diag();camPong=Date.now();dc.send({t:'hello',v:2,name:camName});$('camMode').classList.remove('hide')});
    dc.on('data',m=>{if(!current()||!m||typeof m!=='object')return;
      if(m.t==='ready'){
+       if(m.imageFirst&&!camPreferVideo)camFrameMode=true;
        clearTimeout(camTimer);phase='Kontrollgerät antwortet';camPong=Date.now();diag();camProgress(3,'Kontrollgerät gefunden. Warte auf das erste Bild.');
-       if(camFrameMode){dc.send({t:'fallback'});return}
+       if(camFrameMode){camProgress(3,'Bildmodus startet. Warte auf das erste Bild.');dc.send({t:'fallback'});return}
        if(camCall)return;
        try{const call=camCall=camPeer.call(camTarget,camStream,{metadata:{v:2,name:camName}});const pc=call.peerConnection;
          watchPc(pc,cands,()=>{if(!current())return;phase='Video: '+pc.iceConnectionState;diag();if(pc.iceConnectionState==='failed'){camFrameMode=true;dc.send({t:'fallback'});camProgress(3,'Video-Weg gestört. Bildmodus wird versucht.')}});
@@ -293,7 +298,7 @@ function dial(){
        camAck=Date.now();camPong=Date.now();camFramePending=0;clearTimeout(camTimer);camTries=0;
        $('camProgress').textContent='3/3: Bild am Kontrollgerät bestätigt';setCamStatus(m.mode==='jpeg'?'Verbunden · Bildmodus':'Verbunden · Video','ok');
        $('camMsg').textContent=m.mode==='jpeg'?'Bilder kommen an (bis 4 pro Sekunde). Beide Seiten offen und die Bildschirme an lassen.':'Das Kontrollgerät empfängt dein Bild. Beide Seiten offen und die Bildschirme an lassen.';
-       $('camRetry').classList.add('hide');$('camStart').disabled=true;$('camStart').textContent='Kamera läuft';
+       $('camRetry').classList.add('hide');$('camStart').disabled=true;$('camStart').textContent='Kamera läuft';$('camVideoMode').classList.toggle('hide',m.mode!=='jpeg');
      }
      if(m.t==='busy')fail('Das Kontrollgerät hat schon vier Kameras.','Beende dort eine Kamera.');
      if(m.t==='upgrade')fail('Die Kontrollseite ist noch auf dem alten Stand.','Lade die Kontrollseite neu.');
@@ -387,7 +392,7 @@ function openCtrlPeer(code){
     $('codeTxt').textContent=code;$('linkTxt').textContent=url;
     try{const q=qrcode(0,'M');q.addData(url);q.make();$('qr').innerHTML=q.createSvgTag({cellSize:4,margin:0,scalable:true})}catch(e){$('qr').textContent='QR-Fehler'}
     $('copyLink').onclick=()=>{navigator.clipboard&&navigator.clipboard.writeText(url).then(()=>{$('copyLink').textContent='Kopiert'}).catch(()=>{})};
-    $('techInfo').textContent='Version 2.0: Video und Bildmodus laufen verschlüsselt per WebRTC zwischen den Geräten. Der Bildmodus versucht bei Videofehlern bis zu 4 Einzelbilder pro Sekunde, keine flüssige Videoübertragung. PeerJS vermittelt den Aufbau über das Internet. Öffentliche STUN-/TURN-Server helfen beim Verbindungsweg, ihre Verfügbarkeit ist nicht zugesichert. Ein Gast-WLAN kann Geräte voneinander trennen. Auch gleiches WLAN ist deshalb keine Garantie. Kein Speichern der Kamerabilder auf einem Server. Beide Seiten müssen im Vordergrund bleiben.';
+    $('techInfo').textContent='Version 2.0: Bei iPhone oder iPad startet zuerst der Bildmodus (bis 4 Bilder/s). Auf der Kameraseite lässt sich flüssigeres Video versuchen. Video und Bildmodus laufen verschlüsselt per WebRTC zwischen den Geräten. Der Bildmodus versucht bei Videofehlern bis zu 4 Einzelbilder pro Sekunde, keine flüssige Videoübertragung. PeerJS vermittelt den Aufbau über das Internet. Öffentliche STUN-/TURN-Server helfen beim Verbindungsweg, ihre Verfügbarkeit ist nicht zugesichert. Ein Gast-WLAN kann Geräte voneinander trennen. Auch gleiches WLAN ist deshalb keine Garantie. Kein Speichern der Kamerabilder auf einem Server. Beide Seiten müssen im Vordergrund bleiben.';
   });
   me.on('connection',dc=>{if(me===ctrlPeer)ctrlData(dc);else dc.close()});
   me.on('call',call=>{if(me===ctrlPeer)acceptCall(call);else call.close()});
@@ -427,7 +432,7 @@ function ctrlData(dc){
     if(m.v!==2){ctrlSend(dc,{t:'upgrade'});return}
     const nm=dc.metadata&&dc.metadata.name;[...sources.values()].forEach(x=>{if(nm&&x.kind==='remote'&&x.name===nm&&x.id!==dc.peer){const old=ctrlLinks.get(x.id);if(old)old.close();ctrlLinks.delete(x.id);dropSource(x.id,true)}});
     const remoteIDs=new Set([...sources.values()].filter(s=>s.kind==='local'||(s.call&&s.call.peerConnection&&s.call.peerConnection.connectionState==='connected')).map(s=>s.id).concat([...ctrlLinks.keys()]));if(remoteIDs.size>MAXCAM){ctrlSend(dc,{t:'busy'});setTimeout(()=>dc.close(),500);return}
-    ctrlSend(dc,{t:'ready'});setNet('Kamera gefunden · warte auf Bild','warn');
+    ctrlSend(dc,{t:'ready',imageFirst:IOS});setNet('Kamera gefunden · warte auf Bild','warn');
   }
   if(m.t==='ping')ctrlSend(dc,{t:'pong',visible:document.visibilityState==='visible'});
   if(m.t==='fallback'){const s=sources.get(dc.peer);if(s)s.status.textContent='Bildmodus wird versucht'}
