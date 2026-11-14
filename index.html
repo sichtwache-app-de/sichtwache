@@ -402,16 +402,22 @@ const ctrlLinks=new Map();
 function ctrlSend(dc,m){try{if(dc&&dc.open)dc.send(m)}catch(e){}}
 function showPlay(s){if(!s.playButton){const b=document.createElement('button');b.className='btn';b.textContent='Bild starten';b.onclick=()=>{if(s.video.tagName!=='VIDEO'){b.remove();return}s.video.play().then(()=>{b.remove();s.playButton=null}).catch(()=>{b.textContent='Bild in Safari starten'})};s.tile.appendChild(b);s.playButton=b}s.status.textContent='Safari wartet auf deinen Tipp'}
 function trackRemoteFrames(s,call){
- const v=s.video;let last=-1;
- const tick=()=>{
-  if(!sources.has(s.id)||s.call!==call||s.mode==='jpeg')return;
-  if(document.visibilityState==='visible'&&v.readyState>=2&&!v.paused&&v.currentTime!==last){
-   last=v.currentTime;s.lastFrame=Date.now();s.status.textContent='live';setNet('Kamerabild kommt an','ok');setTimeout(()=>{if(sources.has(s.id))startAnalysis()},2500);
-   ctrlSend(ctrlLinks.get(s.id),{t:'frame',mode:'video'});
-   if(!s.logged){s.logged=true;addLog(s,'info','Kamerabild bestätigt: '+s.name)}
-  }
-  s.frameTimer=setTimeout(tick,650);
- };tick();
+ const v=s.video;let last=-1,lastAck=0;
+ const active=()=>sources.has(s.id)&&s.call===call&&s.mode!=='jpeg';
+ const confirmed=()=>{
+  if(document.visibilityState!=='visible'||v.paused||v.readyState<2)return;
+  s.frameCount=(s.frameCount||0)+1;s.lastFrame=Date.now();s.status.textContent='live';
+  if(Date.now()-lastAck<600)return;lastAck=Date.now();
+  setNet('Kamerabild kommt an','ok');ctrlSend(ctrlLinks.get(s.id),{t:'frame',mode:'video'});
+  if(!s.logged){s.logged=true;addLog(s,'info','Kamerabild bestätigt: '+s.name);setTimeout(()=>{if(sources.has(s.id))startAnalysis()},2500)}
+ };
+ // Safari can advance currentTime even while its video decoder presents no frames.
+ // Prefer the browser's actual presentation callback, not the media clock.
+ if(typeof v.requestVideoFrameCallback==='function'){
+  const next=()=>v.requestVideoFrameCallback(()=>{if(!active())return;confirmed();next()});next();
+ }else{
+  const tick=()=>{if(!active())return;const q=v.getVideoPlaybackQuality&&v.getVideoPlaybackQuality();const count=q&&Number.isFinite(q.totalVideoFrames)?q.totalVideoFrames:v.currentTime;if(count>last&&count>0){last=count;confirmed()}s.frameTimer=setTimeout(tick,650)};tick();
+ }
 }
 function ctrlData(dc){
  const old=ctrlLinks.get(dc.peer);if(old&&old!==dc)old.close();ctrlLinks.set(dc.peer,dc);
