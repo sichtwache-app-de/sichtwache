@@ -6,7 +6,7 @@
 <meta name="theme-color" content="#0b1118">
 <title>Sichtwache - KI-Kamera im Browser</title>
 <style>
-:root{--bg:#0b1118;--card:#141c26;--card2:#1b2532;--line:#263344;--tx:#e8eef6;--mu:#8fa1b6;--ac:#3ddc97;--wa:#ffb020;--er:#ff5c6c;--bl:#4aa3ff}
+:root{color-scheme:dark;--bg:#0b1118;--card:#141c26;--card2:#1b2532;--line:#263344;--tx:#e8eef6;--mu:#8fa1b6;--ac:#3ddc97;--wa:#ffb020;--er:#ff5c6c;--bl:#4aa3ff}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html{-webkit-text-size-adjust:100%}html,body{margin:0;background:var(--bg);color:var(--tx);font:16px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
 body{overflow-wrap:anywhere;padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);min-height:100vh;min-height:100dvh}
@@ -15,6 +15,7 @@ h1{font-size:22px;margin:4px 0 2px}h2{font-size:16px;margin:0 0 8px}
 .mu{color:var(--mu)}.sm{font-size:13px}
 .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px;margin-bottom:12px}
 .btn{appearance:none;border:0;background:var(--ac);color:#04281a;font-weight:700;font-size:16px;padding:13px 16px;border-radius:12px;width:100%;cursor:pointer;margin:5px 0;min-height:48px}
+.btn:disabled{opacity:.65;cursor:default}
 .btn.sec{background:var(--card2);color:var(--tx);border:1px solid var(--line)}
 .btn.bad{background:var(--er);color:#2a0409}
 .btn.sm{width:auto;padding:8px 12px;font-size:14px;min-height:38px;margin:2px}
@@ -29,7 +30,7 @@ input[type=text]{width:100%;background:var(--card2);border:1px solid var(--line)
 .tile{background:#000;border:1px solid var(--line);border-radius:14px;overflow:hidden;position:relative}
 .tile .vw{position:relative;width:100%;background:#000;aspect-ratio:16/9;overflow:hidden}
 .zm{position:absolute;inset:0;transform-origin:0 0;will-change:transform}
-.tile video,.tile canvas{position:absolute;inset:0;width:100%;height:100%;object-fit:fill}
+.tile video,.tile img,.tile canvas{position:absolute;inset:0;width:100%;height:100%;object-fit:fill}
 .tile .cap{display:flex;justify-content:space-between;gap:8px;padding:8px 10px;background:var(--card);font-size:13px;flex-wrap:wrap}
 .tile .bar{height:5px;background:#223;}.tile .bar i{display:block;height:100%;background:var(--wa);width:0}
 .stats{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
@@ -70,7 +71,7 @@ select{background:var(--card2);color:var(--tx);border:1px solid var(--line);bord
 
 <!-- HOME -->
 <section id="home">
-  <h1>Sichtwache</h1>
+  <h1>Sichtwache <span class="sm mu">2.0</span></h1>
   <p class="mu">KI-Kamera im Browser. Kein Konto, keine App, kein Login. Die Erkennung läuft auf deinem Gerät.</p>
   <div class="card">
     <button class="btn" id="bControl">Kontrollgerät starten</button>
@@ -94,19 +95,22 @@ select{background:var(--card2);color:var(--tx);border:1px solid var(--line);bord
 <section id="camera" class="hide">
   <h1>Kameragerät</h1>
   <div class="row" style="margin-bottom:8px"><span class="pill" id="camStatus">Bereit</span><span class="pill" id="camLink"></span></div>
+  <p class="bigmsg" id="camProgress" role="status" aria-live="polite">1/3: Kamera bereit zum Starten</p>
   <div class="camview"><video id="camVideo" autoplay playsinline muted></video></div>
   <div class="card" style="margin-top:12px">
     <button class="btn" id="camStart">Kamera starten und verbinden</button>
     <div class="row"><button class="btn sec sm" id="camFlip">Kamera wechseln</button><button class="btn bad sm" id="camStop">Beenden</button></div>
     <button class="btn hide" id="camRetry">Erneut verbinden</button>
-    <div class="diag" id="camDiag"></div>
-    <p class="bigmsg" id="camMsg">Tippe auf Start und erlaube die Kamera. Wichtig: gleiches WLAN wie das Kontrollgerät (kein Mobilfunk). Danach das Gerät hinstellen und den Bildschirm anlassen.</p>
+    <button class="btn sec hide" id="camMode">Bildmodus versuchen</button>
+    <details><summary>Verbindungsdetails</summary><div class="diag" id="camDiag"></div></details>
+    <p class="bigmsg" id="camMsg">Tippe einmal auf Start und erlaube die Kamera. Der Rest läuft automatisch. Lass die Kontrollseite auf dem anderen Gerät offen.</p>
   </div>
 </section>
 
 <!-- CONTROL -->
 <section id="control" class="hide">
   <div class="row" style="justify-content:space-between"><h1 id="ctrlTitle">Kontrollgerät</h1><div class="row"><span class="pill" id="aiStatus">KI: aus</span><span class="pill" id="netStatus"></span></div></div>
+  <p id="ctrlProblem" class="bigmsg hide" role="alert"></p>
   <div class="diag" id="ctrlDiag" style="margin:4px 0 8px"></div>
   <div class="layout">
     <div>
@@ -118,7 +122,7 @@ select{background:var(--card2);color:var(--tx);border:1px solid var(--line);bord
         <h2>Kamerageräte verbinden</h2>
         <div class="qrbox" id="qr"></div>
         <div class="code" id="codeTxt"></div>
-        <div class="bigmsg" style="font-size:16px">Wichtig: Beide Geräte ins <b>gleiche WLAN</b>. Mobilfunk (5G) klappt oft nicht. Diese Seite offen lassen, Bildschirm nicht ausgehen lassen.</div>
+        <div class="bigmsg" style="font-size:16px"><b>1.</b> QR-Code mit dem Kameragerät scannen.<br><b>2.</b> Link in Safari öffnen und dort einmal auf Start tippen.<br><b>3.</b> Beide Seiten offen und Bildschirme an lassen. Am besten normales WLAN, kein Gast-WLAN.</div>
         <div class="sm mu" style="text-align:center">Auf dem Kameragerät: QR mit der Kamera-App scannen und den Link öffnen. Oder die Seite öffnen, "Beitreten" und diesen Code eingeben.</div>
         <div class="sm mu" id="linkTxt" style="word-break:break-all;margin-top:6px"></div>
         <div class="row" style="margin-top:8px"><button class="btn sec sm" id="copyLink">Link kopieren</button><button class="btn sec sm" id="ctrlRetry">Neu verbinden</button><button class="btn sec sm" id="localCam">Kamera dieses Geräts hinzufügen</button></div>
@@ -205,78 +209,131 @@ function watchPc(pc,store,cb){
 const ID_PREFIX='sw-';
 const rid=()=>Array.from({length:6},()=>'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'[Math.floor(Math.random()*32)]).join('');
 
-/* ===================== CAMERA DEVICE ===================== */
-let camStream=null,camPeer=null,camCall=null,camFacing='environment',camTarget=null,wake=null;
-async function getCam(){
-  return navigator.mediaDevices.getUserMedia({audio:false,video:{facingMode:{ideal:camFacing},width:{ideal:960},height:{ideal:540},frameRate:{ideal:15,max:15}}});
-}
+/* Pairing v2: signaling, data health, then media. No camera access before the Start tap. */
+let camStream=null,camPeer=null,camCall=null,camData=null,camFacing='environment',camTarget=null,wake=null;
+let camGen=0,camTries=0,camTimer=null,camName='Kamera '+(sessionStorage.getItem('sw_camera')||(()=>{const n=rid();sessionStorage.setItem('sw_camera',n);return n})()).slice(0,6),camStarted=false,camBusy=false,camFrameMode=false,camAck=0,camPong=0,camFramePending=0,camFrameSent=0,camFrameCanvas=null,camLastReason='',camBrokerTimer=null;
+const cameraVisible=()=>document.visibilityState==='visible'&&!$('camera').classList.contains('hide');
+function normalCode(value){let s=String(value||'').trim();try{if(s.includes('join='))s=new URLSearchParams(s.split('#')[1]||s.split('?')[1]).get('join')||s}catch(e){}return s.toUpperCase().replace(/[\s-]/g,'')}
+function camMessage(state,reason,step){setCamStatus(state,'err');$('camProgress').textContent='Verbindung prüfen';$('camStart').textContent='Kamera starten und verbinden';camLastReason=reason;$('camMsg').textContent=reason+' '+step;$('camRetry').classList.remove('hide');$('camStart').disabled=false}
 function setCamStatus(t,cls){const e=$('camStatus');e.textContent=t;e.className='pill '+(cls||'')}
-async function startCameraDevice(code){
-  camTarget=ID_PREFIX+code.toUpperCase().trim();
-  show('camera');
-  $('camLink').textContent='Code '+code.toUpperCase();
-  $('camStart').onclick=connectCam;$('camRetry').onclick=()=>{$('camStart').disabled=true;camTries=0;connectCam()};
-  $('camFlip').onclick=async()=>{camFacing=camFacing==='environment'?'user':'environment';if(!camStream)return;try{const ns=await getCam();const nt=ns.getVideoTracks()[0];if(camCall&&camCall.peerConnection){const s=camCall.peerConnection.getSenders().find(x=>x.track&&x.track.kind==='video');if(s)await s.replaceTrack(nt)}camStream.getTracks().forEach(t=>t.stop());camStream=ns;$('camVideo').srcObject=ns}catch(e){$('camMsg').textContent='Wechsel nicht möglich: '+e.message}};
-  $('camStop').onclick=()=>{stopCam();location.hash='';location.reload()};
-  $('camDiag').textContent='Bereit. Code '+code.toUpperCase()+'. Tippe auf "Kamera starten und verbinden".';
-  if(!secure){setCamStatus('Kein https','err');$('camMsg').textContent='Kamera geht nur über https. Bitte die gehostete Seite verwenden.'}
+function camProgress(n,text){$('camProgress').textContent=n+'/3: '+text;$('camMsg').textContent=text;setCamStatus('Verbindung wird aufgebaut','warn')}
+function inlineVideo(v){v.muted=true;v.defaultMuted=true;v.playsInline=true;v.autoplay=true;v.setAttribute('playsinline','');v.setAttribute('webkit-playsinline','');v.setAttribute('muted','')}
+async function getCam(){
+ if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){const e=new Error('Kamera wird hier nicht unterstützt');e.name='UnsupportedError';throw e}
+ try{return await navigator.mediaDevices.getUserMedia({audio:false,video:{facingMode:{ideal:camFacing},width:{ideal:640},height:{ideal:360},frameRate:{ideal:15}}})}
+ catch(e){if(e.name==='OverconstrainedError')return navigator.mediaDevices.getUserMedia({audio:false,video:true});throw e}
 }
-let camGen=0,camTries=0,camTimer=null,camName=null;
+function explainCamera(e){
+ const table={NotAllowedError:['Safari hat keinen Kamera-Zugriff.','Erlaube die Kamera in den Website-Einstellungen.'],SecurityError:['Dieser Browser sperrt die Kamera.','Öffne den QR-Link direkt in Safari.'],NotFoundError:['Es wurde keine Kamera gefunden.','Öffne die Seite auf einem Gerät mit Kamera.'],NotReadableError:['Die Kamera ist gerade nicht verfügbar.','Schließe andere Apps oder Tabs, die die Kamera benutzen.'],AbortError:['Der Kamerastart wurde unterbrochen.','Tippe auf "Erneut verbinden".'],OverconstrainedError:['Die Kamera konnte auch mit einfachen Einstellungen nicht starten.','Öffne den QR-Link direkt in Safari.'],UnsupportedError:['Dieser Browser bietet keinen Kamera-Zugriff.','Öffne den QR-Link direkt in Safari.']};
+ const msg=table[e.name]||['Die Kamera konnte nicht starten.','Tippe auf "Erneut verbinden".'];$('camDiag').textContent='Kamera: '+e.name;camMessage('Kamera nicht bereit',...msg)
+}
+function trackCamera(){const t=camStream&&camStream.getVideoTracks()[0];if(!t)return;t.addEventListener('ended',()=>{if(camStarted)camMessage('Kamera gestoppt','Safari hat die Kamera beendet.','Tippe auf "Erneut verbinden".')});t.addEventListener('mute',()=>{if(cameraVisible())camMessage('Kamera pausiert','Die Kamera liefert gerade kein Bild.','Schließe andere Apps oder Tabs, die die Kamera benutzen.')});t.addEventListener('unmute',()=>{if(camStarted&&cameraVisible()){camAck=0;camProgress(3,'Kamera ist wieder da. Warte auf das Bild am Kontrollgerät.')}})}
+async function startCameraDevice(raw){
+ const code=normalCode(raw);show('camera');$('camLink').textContent='Code '+code;
+ if(!/^[A-Z2-9]{6}$/.test(code)){camMessage('Code nicht gültig','Der Code muss sechs Zeichen haben.','Scanne den QR-Code am Kontrollgerät neu.');$('camStart').classList.add('hide');$('camRetry').classList.add('hide');$('camFlip').disabled=true;return}
+ camTarget=ID_PREFIX+code;inlineVideo($('camVideo'));
+ $('camStart').onclick=connectCam;$('camRetry').onclick=connectCam;
+ $('camMode').onclick=()=>{if(camData&&camData.open){camFrameMode=true;camProgress(3,'Bildmodus startet. Er ist langsamer als Video.');camData.send({t:'fallback'})}};
+ $('camFlip').onclick=async()=>{if(camBusy)return;camBusy=true;camFacing=camFacing==='environment'?'user':'environment';try{
+   // iOS cannot reliably keep both cameras open. Release the old device first.
+   if(camStream)camStream.getTracks().forEach(t=>t.stop());camStream=null;
+   camStream=await getCam();trackCamera();$('camVideo').srcObject=camStream;await $('camVideo').play().catch(()=>{});camTries=0;dial();
+ }catch(e){explainCamera(e)}finally{camBusy=false}};
+ $('camStop').onclick=()=>{stopCam();location.hash='';location.reload()};
+ $('camDiag').textContent='Version 2.0 · Kamera erst nach deinem Tippen.';
+ if(!secure){camMessage('Sichere Seite nötig','Die Kamera braucht eine sichere Seite.','Öffne den QR-Link direkt in Safari.');$('camStart').disabled=true}
+}
+async function screenAwake(){try{if(!wake||wake.released)wake=await navigator.wakeLock.request('screen')}catch(e){}}
 async function connectCam(){
-  $('camStart').disabled=true;$('camRetry').classList.add('hide');$('camDiag').textContent='Kamera wird angefragt (Erlaubnis-Dialog bestätigen) ...';
-  if(!camStream){
-    setCamStatus('Kamera wird gestartet...','warn');
-    try{camStream=await getCam()}catch(e){setCamStatus('Keine Kamera','err');$('camMsg').textContent='Die Kamera ist nicht erlaubt. Tippe in Safari links in der Adresszeile auf "Aa", dann auf "Website-Einstellungen" und erlaube die Kamera. Danach hier "Erneut verbinden". ('+(e.name||e.message)+')';$('camStart').disabled=false;$('camRetry').classList.remove('hide');return}
-    $('camVideo').srcObject=camStream;
-  }
-  try{wake=await navigator.wakeLock.request('screen')}catch(e){}
-  camTries=0;dial();
+ if(camBusy||!camTarget||!cameraVisible())return;camBusy=true;camStarted=true;camTries=0;
+ $('camStart').disabled=true;$('camStart').textContent='Kamera starten und verbinden';$('camRetry').classList.add('hide');camProgress(1,'Erlaube die Kamera, falls Safari fragt.');
+ try{
+   if(!camStream||camStream.getVideoTracks().some(t=>t.readyState==='ended')){camStream=await getCam();trackCamera()}
+   const v=$('camVideo');inlineVideo(v);v.srcObject=camStream;await v.play().catch(()=>{});screenAwake();dial();
+ }catch(e){explainCamera(e)}finally{camBusy=false}
 }
+function resetCamLinks(){clearTimeout(camTimer);clearTimeout(camBrokerTimer);try{camCall&&camCall.close()}catch(e){}try{camData&&camData.close()}catch(e){}try{camPeer&&camPeer.destroy()}catch(e){}camCall=null;camData=null;camPeer=null}
 function dial(){
-  const my=++camGen;camTries++;clearTimeout(camTimer);
-  try{camCall&&camCall.close()}catch(e){}try{camPeer&&camPeer.destroy()}catch(e){}
-  const cands={};let broker='verbinde',sig='-',ice='-';
-  const diag=()=>{$('camDiag').textContent='Versuch '+camTries+'/3 | Server: '+broker+' | Antwort vom Kontrollgerät: '+sig+' | Verbindung: '+ice+' | Kandidaten: '+candTxt(cands)+(RELAY?' | NUR RELAY':'')};
-  const fail=(st,msg)=>{if(my!==camGen)return;clearTimeout(camTimer);setCamStatus(st,'err');$('camMsg').textContent=msg;$('camStart').disabled=false;$('camRetry').classList.remove('hide');diag()};
-  const retry=why=>{if(camTries>=3)return false;$('camMsg').textContent=why+' Ich versuche es gleich nochmal ...';setCamStatus('Neuer Versuch ...','warn');camTimer=setTimeout(()=>{if(my===camGen)dial()},3000);return true};
-  setCamStatus('Verbinde ('+camTries+'/3) ...','warn');$('camMsg').textContent='Verbindung wird aufgebaut ...';diag();
-  camPeer=new Peer(PEER_OPTS);
-  setTimeout(()=>{if(my!==camGen||broker==='ok')return;broker='keine Antwort (12 s)';diag();if(!retry('Vermittlungsserver antwortet nicht (Netz blockiert 0.peerjs.com?).'))fail('Server nicht erreichbar','Die Verbindungsstelle im Internet antwortet nicht. Vielleicht blockiert das WLAN oder ein Werbeblocker sie. Probiere ein anderes WLAN oder das Mobilnetz. Dann "Erneut verbinden".')},12000);
-  camPeer.on('error',e=>{if(my!==camGen)return;
-    if(e.type==='peer-unavailable'){broker='ok';sig='Code nicht gefunden';diag();if(!retry('Das Kontrollgerät ist gerade nicht zu finden.'))fail('Kontrollgerät nicht gefunden','Das Kontrollgerät ist nicht zu finden. Mach Folgendes: 1) Auf dem Kontrollgerät die Seite offen lassen und den Bildschirm nicht ausgehen lassen. 2) Auf dem Kontrollgerät den QR-Code neu zeigen und hier neu scannen. 3) Dann hier "Erneut verbinden".')}
-    else{broker='Fehler '+e.type;diag();if(!retry('Vermittlungsserver nicht erreichbar ('+e.type+').'))fail('Server nicht erreichbar','Die Verbindungsstelle im Internet ist gerade nicht erreichbar. Prüfe, ob dieses Gerät Internet hat. Dann "Erneut verbinden".')}});
-  camPeer.on('disconnected',()=>{if(my!==camGen)return;broker='getrennt';diag();try{camPeer.reconnect()}catch(e){}});
-  camPeer.on('open',()=>{
-    if(my!==camGen)return;broker='ok';diag();
-    if(!camName)camName='Kamera '+camPeer.id.slice(-3).toUpperCase();
-    camCall=camPeer.call(camTarget,camStream,{metadata:{name:camName}});
-    if(!camCall){fail('Fehler','Anruf konnte nicht gestartet werden.');return}
-    const pc=camCall.peerConnection;
-    const upd=()=>{if(my!==camGen)return;ice=pc.iceConnectionState;sig=pc.signalingState==='stable'?'ja':'noch nicht';diag();
-      if(ice==='connected'||ice==='completed'){clearTimeout(camTimer);setCamStatus('Verbunden, sendet Video','ok');$('camMsg').textContent='Läuft. Gerät hinstellen, Bildschirm anlassen.';$('camRetry').classList.add('hide');$('camStart').disabled=true}
-      else if(ice==='failed'){clearTimeout(camTimer);if(!retry('Direkte Verbindung fehlgeschlagen.'))fail('Verbindung fehlgeschlagen','Die zwei Geräte finden keinen Weg zueinander. Mach Folgendes: Beide Geräte ins GLEICHE WLAN. Mobilfunk (5G) schalten. Dann hier "Erneut verbinden".')}
-      else if(ice==='disconnected')setCamStatus('Unterbrochen ...','warn');
-      else setCamStatus('Verbinde ('+camTries+'/3) ...','warn')};
-    watchPc(pc,cands,upd);upd();
-    camCall.on('close',()=>{if(my!==camGen)return;setCamStatus('Getrennt (oder schon 4 Kameras verbunden)','err');$('camStart').disabled=false;$('camRetry').classList.remove('hide')});
-    camCall.on('error',e=>{if(my!==camGen)return;fail('Fehler',String(e))});
-    camTimer=setTimeout(()=>{
-      if(my!==camGen)return;const st=pc.iceConnectionState;if(st==='connected'||st==='completed')return;
-      let why;
-      if(pc.signalingState!=='stable')why='Das Kontrollgerät antwortet nicht. Ist die Seite dort offen und der Bildschirm an?';
-      else if(!cands.srflx&&!cands.relay)why='Dein Netz lässt die Verbindung nicht durch. Nutze das gleiche WLAN wie das Kontrollgerät, kein Mobilfunk.';
-      else why='Die zwei Geräte finden keinen Weg zueinander. Beide ins gleiche WLAN, kein Mobilfunk (5G).';
-      if(!retry(why))fail('Keine Verbindung',why+' Danach hier "Erneut verbinden" tippen.');
-    },25000);
-  });
+ if(!camStarted||!cameraVisible())return;
+ const gen=++camGen;resetCamLinks();camTries++;camAck=0;camPong=Date.now();camFrameMode=/frames=1/.test(location.hash);camFramePending=0;camFrameSent=0;
+ const cands={};let phase='Server wird gesucht',lastError='';
+ const diag=()=>{$('camDiag').textContent='Version 2.0 · Versuch '+camTries+'/2 · '+phase+' · Wege: '+candTxt(cands)+(lastError?' · '+lastError:'')};
+ const current=()=>gen===camGen&&camStarted;
+ const fail=(reason,step)=>{if(!current())return;clearTimeout(camTimer);clearTimeout(camBrokerTimer);camMessage('Verbindung nicht fertig',reason,step);diag()};
+ const retry=(reason,step)=>{if(!current())return;if(camTries<2&&cameraVisible()){camProgress(2,reason+' Ein neuer Versuch startet.');clearTimeout(camTimer);camTimer=setTimeout(()=>{if(current())dial()},1800)}else fail(reason,step)};
+ if(typeof Peer!=='function'){fail('Die Verbindungs-Software wurde nicht geladen.','Lade die Seite neu.');return}
+ camProgress(2,'Kontrollgerät wird gesucht.');diag();
+ try{camPeer=new Peer(PEER_OPTS)}catch(e){fail('Dieser Browser unterstützt die Verbindung nicht.','Öffne den QR-Link direkt in Safari.');return}
+ camBrokerTimer=setTimeout(()=>retry('Die Verbindungsstelle im Internet antwortet nicht.','Öffne die Seite in einem anderen WLAN.'),12000);
+ camPeer.on('error',e=>{if(!current())return;lastError=e.type;diag();
+   if(e.type==='peer-unavailable')retry('Der QR-Code ist nicht mehr erreichbar.','Scanne den aktuellen QR-Code am Kontrollgerät.');
+   else if(e.type==='browser-incompatible')fail('Dieser Browser unterstützt die Verbindung nicht.','Öffne den QR-Link direkt in Safari.');
+   else retry('Der Aufbau über den Internet-Server ist abgebrochen.','Tippe auf "Erneut verbinden".');
+ });
+ camPeer.on('disconnected',()=>{if(!current())return;phase='Internet-Verbindung unterbrochen';diag();if(camPeer&&!camPeer.destroyed)try{camPeer.reconnect()}catch(e){}});
+ camPeer.on('open',()=>{
+   if(!current())return;clearTimeout(camBrokerTimer);phase='Server erreichbar, warte auf Kontrollgerät';diag();
+   const dc=camData=camPeer.connect(camTarget,{reliable:true,metadata:{v:2,name:camName}});
+   if(dc.peerConnection)watchPc(dc.peerConnection,cands,diag);
+   dc.on('open',()=>{if(!current())return;phase='Datenweg offen';diag();camPong=Date.now();dc.send({t:'hello',v:2,name:camName});$('camMode').classList.remove('hide')});
+   dc.on('data',m=>{if(!current()||!m||typeof m!=='object')return;
+     if(m.t==='ready'){
+       clearTimeout(camTimer);phase='Kontrollgerät antwortet';camPong=Date.now();diag();camProgress(3,'Kontrollgerät gefunden. Warte auf das erste Bild.');
+       if(camFrameMode){dc.send({t:'fallback'});return}
+       if(camCall)return;
+       try{const call=camCall=camPeer.call(camTarget,camStream,{metadata:{v:2,name:camName}});const pc=call.peerConnection;
+         watchPc(pc,cands,()=>{if(!current())return;phase='Video: '+pc.iceConnectionState;diag();if(pc.iceConnectionState==='failed'){camFrameMode=true;dc.send({t:'fallback'});camProgress(3,'Video-Weg gestört. Bildmodus wird versucht.')}});
+         call.on('error',()=>{if(current()){camFrameMode=true;dc.send({t:'fallback'})}});
+         call.on('close',()=>{if(current()&&camData&&camData.open){camFrameMode=true;dc.send({t:'fallback'})}});
+       }catch(e){camFrameMode=true;dc.send({t:'fallback'})}
+       camTimer=setTimeout(()=>{if(current()&&!camAck){camFrameMode=true;dc.send({t:'fallback'});camProgress(3,'Noch kein Videobild. Bildmodus wird versucht.')}},6500);
+     }
+     if(m.t==='pong'){camPong=Date.now();if(m.visible===false)camMessage('Kontrollgerät pausiert','Die Kontrollseite ist nicht im Vordergrund.','Öffne die Kontrollseite auf dem anderen Gerät.')}
+     if(m.t==='frame'){
+       camAck=Date.now();camPong=Date.now();camFramePending=0;clearTimeout(camTimer);camTries=0;
+       $('camProgress').textContent='3/3: Bild am Kontrollgerät bestätigt';setCamStatus(m.mode==='jpeg'?'Verbunden · Bildmodus':'Verbunden · Video','ok');
+       $('camMsg').textContent=m.mode==='jpeg'?'Bilder kommen an (bis 4 pro Sekunde). Beide Seiten offen und die Bildschirme an lassen.':'Das Kontrollgerät empfängt dein Bild. Beide Seiten offen und die Bildschirme an lassen.';
+       $('camRetry').classList.add('hide');$('camStart').disabled=true;$('camStart').textContent='Kamera läuft';
+     }
+     if(m.t==='busy')fail('Das Kontrollgerät hat schon vier Kameras.','Beende dort eine Kamera.');
+     if(m.t==='upgrade')fail('Die Kontrollseite ist noch auf dem alten Stand.','Lade die Kontrollseite neu.');
+   });
+   dc.on('error',()=>{if(current())retry('Der Datenweg zum Kontrollgerät ist abgebrochen.','Tippe auf "Erneut verbinden".')});
+   dc.on('close',()=>{if(current())retry('Die Verbindung zum Kontrollgerät wurde beendet.','Öffne die Kontrollseite auf dem anderen Gerät.')});
+   camTimer=setTimeout(()=>{
+     if(!current())return;
+     const answered=dc.peerConnection&&dc.peerConnection.remoteDescription;
+     retry(dc.open?'Die Kontrollseite bestätigt den Aufbau nicht.':answered?'Die Geräte konnten keinen direkten Datenweg aufbauen.':'Der QR-Code wurde vom Kontrollgerät nicht bestätigt.',dc.open?'Lade die Kontrollseite neu.':answered?'Verbinde beide Geräte mit einem normalen WLAN ohne Gastzugang.':'Scanne den aktuellen QR-Code am Kontrollgerät.');
+   },18000);
+ });
 }
-document.addEventListener('visibilitychange',()=>{
-  if(document.visibilityState!=='visible')return;
-  if(camStream&&!$('camera').classList.contains('hide')){try{navigator.wakeLock.request('screen').then(w=>wake=w).catch(()=>{})}catch(e){}
-    const st=camCall&&camCall.peerConnection&&camCall.peerConnection.iceConnectionState;if(camPeer&&st!=='connected'&&st!=='completed'){camTries=0;dial()}}
-  if(ctrlPeer)ctrlWatch();
-});
-function stopCam(){try{camCall&&camCall.close()}catch(e){}try{camPeer&&camPeer.destroy()}catch(e){}if(camStream)camStream.getTracks().forEach(t=>t.stop());try{wake&&wake.release()}catch(e){}}
+setInterval(()=>{
+ if(!camStarted||!cameraVisible()||!camData||!camData.open)return;
+ const now=Date.now();
+ if(now-camPong>13000){camMessage('Keine Antwort','Das Kontrollgerät antwortet nicht mehr.','Öffne die Kontrollseite auf dem anderen Gerät.');return}
+ try{camData.send({t:'ping'});}catch(e){}
+ if(camAck&&now-camAck>6000){camFrameMode=true;$('camMsg').textContent='Das Bild kommt gerade nicht weiter. Ich versuche den Bildmodus.'}
+},2000);
+setInterval(()=>{
+ if(!camStarted||!cameraVisible()||!camFrameMode||!camData||!camData.open||camFramePending)return;
+ const v=$('camVideo');if(v.readyState<2||!v.videoWidth)return;
+ if(camData.dataChannel&&camData.dataChannel.bufferedAmount>32768)return;
+ if(!camFrameCanvas)camFrameCanvas=document.createElement('canvas');const c=camFrameCanvas;
+ c.width=Math.min(480,v.videoWidth);c.height=Math.round(c.width*v.videoHeight/v.videoWidth);c.getContext('2d').drawImage(v,0,0,c.width,c.height);
+ const jpeg=c.toDataURL('image/jpeg',.5);if(jpeg.length>220000)return;
+ try{camFramePending=++camFrameSent;const n=camFramePending;camData.send({t:'jpeg',n,image:jpeg});setTimeout(()=>{if(camFramePending===n)camFramePending=0},1500)}catch(e){camFramePending=0}
+},250);
+function stopCam(){camStarted=false;++camGen;resetCamLinks();if(camStream)camStream.getTracks().forEach(t=>t.stop());camStream=null;try{wake&&wake.release()}catch(e){}}
+function resumePage(){
+ if(document.visibilityState!=='visible'){if(camStarted)setCamStatus('Pausiert · Seite im Hintergrund','warn');return}
+ if(camStarted&&!$('camera').classList.contains('hide')){
+   screenAwake();const t=camStream&&camStream.getVideoTracks()[0];
+   if(!t||t.readyState==='ended'){camMessage('Kamera gestoppt','Safari hat die Kamera im Hintergrund beendet.','Tippe auf "Erneut verbinden".');return}
+   $('camVideo').play().catch(()=>{});camTries=0;dial();
+ }
+ if(ctrlPeer){ctrlWakeLock();ctrlWatch();sources.forEach(s=>{if(s.video.tagName==='VIDEO')s.video.play().catch(()=>showPlay(s))})}
+}
+document.addEventListener('visibilitychange',resumePage);window.addEventListener('pageshow',e=>{if(e.persisted)resumePage()});
 
 /* ===================== CONTROL DEVICE ===================== */
 const MAXCAM=4;const sources=new Map();let ctrlPeer=null,ctrlId=null,srcCount=0,analysisStarted=false;
@@ -288,7 +345,7 @@ const models={coco:null,face:false,state:'aus'};
 
 const MOBILE=/Android|iPhone|iPad|iPod/.test(navigator.userAgent)||(navigator.maxTouchPoints>1&&/Mac/.test(navigator.userAgent));
 function setAI(t,c){const e=$('aiStatus');e.textContent='KI: '+t;e.className='pill '+(c||'')}
-function setNet(t,c){const e=$('netStatus');e.classList.toggle('hide',!t);e.textContent=t;e.className='pill '+(c||'')}
+function setNet(t,c){const p=$('ctrlProblem');if(p){p.textContent=c==='err'?t:'';p.classList.toggle('hide',c!=='err')}const e=$('netStatus');e.classList.toggle('hide',!t);e.textContent=t;e.className='pill '+(c||'')}
 
 function startControl(single){
   show('control');
@@ -297,7 +354,7 @@ function startControl(single){
   isSingle=!!single;
   if(!single)ctrlWakeLock();
   if(single){$('techInfo').textContent='Einzelgerät-Modus: nichts wird übertragen, das Video bleibt auf diesem Gerät.';addLocalCam();startAnalysis();return}
-  let code=sessionStorage.getItem('sw_code')||rid();sessionStorage.setItem('sw_code',code);
+  const code=rid();sessionStorage.setItem('sw_code',code);
   openCtrlPeer(code);
   updateEmpty();
   setAI('startet, sobald die erste Kamera da ist','');
@@ -319,42 +376,95 @@ setInterval(()=>{
 },1500);
 function openCtrlPeer(code){
   ctrlId=ID_PREFIX+code;ctrlCode=code;setNet('Verbinde...','warn');brokerTxt='verbinde';
-  setTimeout(()=>{if(ctrlPeer&&!ctrlPeer.open&&!ctrlPeer.destroyed){brokerTxt='keine Antwort von 0.peerjs.com';setNet('Vermittlungsserver nicht erreichbar','err')}},12000);
+  setTimeout(()=>{if(me===ctrlPeer&&!me.open&&!me.destroyed){brokerTxt='keine Antwort von 0.peerjs.com';setNet('Server antwortet nicht. Öffne ein anderes WLAN.','err')}},12000);
   try{ctrlPeer&&!ctrlPeer.destroyed&&ctrlPeer.destroy()}catch(e){}
   const me=ctrlPeer=new Peer(ctrlId,PEER_OPTS);
   me.on('open',()=>{
+    if(me!==ctrlPeer)return;
     brokerTxt='verbunden';setNet('Bereit für Kameras','ok');
     const base=location.href.split('#')[0];
-    const url=base+'#join='+code;
+    const url=base+'#join='+code+'&v=2';
     $('codeTxt').textContent=code;$('linkTxt').textContent=url;
     try{const q=qrcode(0,'M');q.addData(url);q.make();$('qr').innerHTML=q.createSvgTag({cellSize:4,margin:0,scalable:true})}catch(e){$('qr').textContent='QR-Fehler'}
     $('copyLink').onclick=()=>{navigator.clipboard&&navigator.clipboard.writeText(url).then(()=>{$('copyLink').textContent='Kopiert'}).catch(()=>{})};
-    $('techInfo').textContent='Verbindung: WebRTC direkt zwischen den Geräten. Vermittlung beim Aufbau: öffentlicher PeerJS-Cloud-Server (0.peerjs.com). STUN: Google und Twilio. Falls kein direkter Weg geht, Relay über kostenlose öffentliche TURN-Server (PeerJS, Open Relay von Metered). Kein eigener Server, kein Konto. Wichtig: dieses Gerät muss die Seite offen und den Bildschirm an lassen.';
+    $('techInfo').textContent='Version 2.0: Video und Bildmodus laufen verschlüsselt per WebRTC zwischen den Geräten. Der Bildmodus versucht bei Videofehlern bis zu 4 Einzelbilder pro Sekunde, keine flüssige Videoübertragung. PeerJS vermittelt den Aufbau über das Internet. Öffentliche STUN-/TURN-Server helfen beim Verbindungsweg, ihre Verfügbarkeit ist nicht zugesichert. Ein Gast-WLAN kann Geräte voneinander trennen. Auch gleiches WLAN ist deshalb keine Garantie. Kein Speichern der Kamerabilder auf einem Server. Beide Seiten müssen im Vordergrund bleiben.';
   });
-  me.on('call',call=>{
-    const nm=call.metadata&&call.metadata.name;
-    if(nm)[...sources.values()].forEach(x=>{if(x.kind==='remote'&&x.name===nm&&x.id!==call.peer)dropSource(x.id,true)});
-    if(!sources.has(call.peer)&&sources.size>=MAXCAM){call.close();addLog(null,'info','Kamera abgelehnt: schon '+MAXCAM+' Kameras verbunden');return}
-    call.answer();
-    let s=sources.get(call.peer);if(!s){s=makeTile(call.peer,nm||('Kamera '+(++srcCount)),'remote')}
-    s.call=call;s.cands={};s.status.textContent='Kamera verbindet ...';
-    call.on('stream',stream=>addRemote(call,stream));
-    call.on('close',()=>dropSource(call.peer));
-    call.on('error',()=>dropSource(call.peer));
-    const pc=call.peerConnection;
-    if(pc)watchPc(pc,s.cands,()=>{const st=pc.iceConnectionState;if(!sources.has(call.peer))return;
-      if(st==='disconnected'||st==='failed'||st==='closed'){s.status.textContent='getrennt';setTimeout(()=>{if(pc.iceConnectionState!=='connected'&&pc.iceConnectionState!=='completed')dropSource(call.peer)},8000)}
-      else if(st==='connected'||st==='completed'){if(s.logged)s.status.textContent='live'}
-      else s.status.textContent='Kamera verbindet ('+st+') ...'});
-    setTimeout(()=>{const x=sources.get(call.peer);if(x&&!x.logged){addLog(null,'info','Kamera '+x.name+' hat sich nicht fertig verbunden (ICE '+(pc?pc.iceConnectionState:'-')+')');dropSource(call.peer,true)}},30000);
-  });
+  me.on('connection',dc=>{if(me===ctrlPeer)ctrlData(dc);else dc.close()});
+  me.on('call',call=>{if(me===ctrlPeer)acceptCall(call);else call.close()});
   me.on('error',e=>{
     if(me!==ctrlPeer)return;
-    if(e.type==='unavailable-id'){setTimeout(()=>{if(me===ctrlPeer)openCtrlPeer(code)},2500)}
-    else{brokerTxt='Fehler '+e.type;setNet('Netzfehler: '+e.type+' (versuche erneut)','err')}
+    if(e.type==='unavailable-id'){setTimeout(()=>{if(me===ctrlPeer)openCtrlPeer(rid())},800)}
+    else{brokerTxt='Fehler '+e.type;setNet(e.type==='browser-incompatible'?'Dieser Browser unterstützt die Verbindung nicht. Öffne die Seite direkt in Safari.':'Der Verbindungsserver ist nicht erreichbar. Öffne ein anderes WLAN.','err')}
   });
   me.on('disconnected',()=>{if(me!==ctrlPeer)return;brokerTxt='getrennt';setNet('Getrennt, verbinde neu...','warn');try{me.reconnect()}catch(e){}});
 }
+const ctrlLinks=new Map();
+function ctrlSend(dc,m){try{if(dc&&dc.open)dc.send(m)}catch(e){}}
+function showPlay(s){if(!s.playButton){const b=document.createElement('button');b.className='btn';b.textContent='Bild starten';b.onclick=()=>{if(s.video.tagName!=='VIDEO'){b.remove();return}s.video.play().then(()=>{b.remove();s.playButton=null}).catch(()=>{b.textContent='Bild in Safari starten'})};s.tile.appendChild(b);s.playButton=b}s.status.textContent='Safari wartet auf deinen Tipp'}
+function trackRemoteFrames(s,call){
+ const v=s.video;let last=-1;
+ const tick=()=>{
+  if(!sources.has(s.id)||s.call!==call||s.mode==='jpeg')return;
+  if(document.visibilityState==='visible'&&v.readyState>=2&&!v.paused&&v.currentTime!==last){
+   last=v.currentTime;s.lastFrame=Date.now();s.status.textContent='live';setNet('Kamerabild kommt an','ok');setTimeout(()=>{if(sources.has(s.id))startAnalysis()},2500);
+   ctrlSend(ctrlLinks.get(s.id),{t:'frame',mode:'video'});
+   if(!s.logged){s.logged=true;addLog(s,'info','Kamerabild bestätigt: '+s.name)}
+  }
+  s.frameTimer=setTimeout(tick,650);
+ };tick();
+}
+function ctrlData(dc){
+ const old=ctrlLinks.get(dc.peer);if(old&&old!==dc)old.close();ctrlLinks.set(dc.peer,dc);
+ dc.on('data',m=>{
+  if(ctrlLinks.get(dc.peer)!==dc||!m||typeof m!=='object')return;
+  if(m.t==='hello'){
+    if(m.v!==2){ctrlSend(dc,{t:'upgrade'});return}
+    const nm=dc.metadata&&dc.metadata.name;[...sources.values()].forEach(x=>{if(nm&&x.kind==='remote'&&x.name===nm&&x.id!==dc.peer){const old=ctrlLinks.get(x.id);if(old)old.close();ctrlLinks.delete(x.id);dropSource(x.id,true)}});
+    const remoteIDs=new Set([...sources.values()].filter(s=>s.kind==='local'||(s.call&&s.call.peerConnection&&s.call.peerConnection.connectionState==='connected')).map(s=>s.id).concat([...ctrlLinks.keys()]));if(remoteIDs.size>MAXCAM){ctrlSend(dc,{t:'busy'});setTimeout(()=>dc.close(),500);return}
+    ctrlSend(dc,{t:'ready'});setNet('Kamera gefunden · warte auf Bild','warn');
+  }
+  if(m.t==='ping')ctrlSend(dc,{t:'pong',visible:document.visibilityState==='visible'});
+  if(m.t==='fallback'){const s=sources.get(dc.peer);if(s)s.status.textContent='Bildmodus wird versucht'}
+  if(m.t==='jpeg'){
+   if(typeof m.image!=='string'||m.image.length>220000||!/^data:image\/jpeg;base64,/.test(m.image)||!Number.isSafeInteger(m.n))return;
+   let s=sources.get(dc.peer);
+   if(!s){if(sources.size>=MAXCAM){ctrlSend(dc,{t:'busy'});return}s=makeTile(dc.peer,dc.metadata&&dc.metadata.name||'Kamera','remote')}
+   if(s.decoding)return;
+   if(s.mode!=='jpeg'){
+    s.mode='jpeg';clearTimeout(s.frameTimer);if(s.playButton){s.playButton.remove();s.playButton=null}const oldVideo=s.video;oldVideo.pause();oldVideo.srcObject=null;oldVideo.remove();
+    const image=document.createElement('img');image.alt='Kamerabild im Bildmodus';
+    Object.defineProperties(image,{videoWidth:{get(){return this.naturalWidth}},videoHeight:{get(){return this.naturalHeight}},readyState:{get(){return this.complete&&this.naturalWidth?2:0}}});
+    s.tile.querySelector('.zm').prepend(image);s.video=image;
+   }
+   s.decoding=true;const image=s.video;
+   image.onload=()=>{s.decoding=false;if(!sources.has(s.id))return;s.lastFrame=Date.now();setTimeout(()=>{if(sources.has(s.id))startAnalysis()},2500);s.status.textContent='live · Bildmodus (bis 4 Bilder/s)';if(document.visibilityState==='visible')ctrlSend(dc,{t:'frame',mode:'jpeg',n:m.n});setNet('Kamerabild kommt an','ok');
+    if(!s.logged){s.logged=true;addLog(s,'info','Kamerabild im Bildmodus bestätigt: '+s.name)}};
+   image.onerror=()=>{s.decoding=false};image.src=m.image;
+  }
+ });
+ dc.on('close',()=>{if(ctrlLinks.get(dc.peer)!==dc)return;ctrlLinks.delete(dc.peer);const s=sources.get(dc.peer);if(s){s.status.textContent='Verbindung unterbrochen';setTimeout(()=>{if(!ctrlLinks.has(dc.peer))dropSource(dc.peer)},5000)}});
+ dc.on('error',()=>{const s=sources.get(dc.peer);if(s)s.status.textContent='Datenweg unterbrochen'});
+}
+setInterval(()=>{
+ if($('control').classList.contains('hide'))return;
+ sources.forEach(s=>{if(s.kind==='remote'&&s.lastFrame&&Date.now()-s.lastFrame>6500)s.status.textContent='Kein neues Bild · Kameraseite öffnen'});
+},2000);
+function acceptCall(call){
+ const nm=call.metadata&&call.metadata.name;
+ if(nm)[...sources.values()].forEach(x=>{if(x.kind==='remote'&&x.name===nm&&x.id!==call.peer)dropSource(x.id,true)});
+ [...sources.values()].forEach(x=>{if(x.kind==='remote'&&!ctrlLinks.has(x.id)&&(!x.call||!x.call.peerConnection||x.call.peerConnection.connectionState!=='connected'))dropSource(x.id,true)});
+ if(!sources.has(call.peer)&&sources.size>=MAXCAM){ctrlSend(ctrlLinks.get(call.peer),{t:'busy'});call.close();return}
+ let s=sources.get(call.peer);if(!s)s=makeTile(call.peer,nm||'Kamera','remote');
+ s.call=call;s.cands={};s.status.textContent='Kamera gefunden · warte auf Bild';
+ // Register before answering: an immediate track event must not be lost.
+ call.on('stream',stream=>{if(s.call===call&&s.mode!=='jpeg')addRemote(call,stream)});
+ call.on('close',()=>{if(s.call===call&&s.mode!=='jpeg')s.status.textContent='Video unterbrochen · Bildmodus wird versucht'});
+ call.on('error',()=>{if(s.call===call)s.status.textContent='Video-Weg gestört · Bildmodus wird versucht'});
+ call.answer();
+ const pc=call.peerConnection;
+ if(pc)watchPc(pc,s.cands,()=>{if(s.call!==call||s.mode==='jpeg')return;const st=pc.iceConnectionState;if(st==='failed')s.status.textContent='Video-Weg gesperrt · Bildmodus wird versucht';else if(st==='disconnected')s.status.textContent='Video unterbrochen';});
+}
+
 function makeTile(id,name,kind){
   const t=document.createElement('div');t.className='tile';
   t.innerHTML='<div class="vw"><div class="zm"><video autoplay playsinline muted></video><canvas></canvas></div></div><div class="bar"><i></i></div><div class="cap"><b></b><span class="st"></span><span class="info mu"></span></div><div class="cap" style="padding-top:0"><button class="btn sec sm zbtn">Zone zeichnen</button><button class="btn sec sm zclr hide">Zone löschen</button><span class="mu zhint"></span></div>';
@@ -362,6 +472,7 @@ function makeTile(id,name,kind){
   const slot=document.createElement('div');slot.className='slot';slot.appendChild(t);$('camGrid').appendChild(slot);
   const s={id,name,kind,tile:t,video:t.querySelector('video'),canvas:t.querySelector('canvas'),bar:t.querySelector('.bar i'),status:t.querySelector('.st'),info:t.querySelector('.info'),
     slot,tracks:[],nextId:1,prev:null,lastMotion:0,motionPct:0,motionBox:null,lastFace:0,faces:[],persNow:0,mc:document.createElement('canvas'),lastObj:0,ended:[],zsc:1,zx:.5,zy:.5};
+  inlineVideo(s.video);
   s.mc.width=64;s.mc.height=48;s.status.textContent='verbinde';s.zone=null;s.drawing=false;
   const zb=t.querySelector('.zbtn'),zc=t.querySelector('.zclr'),zh=t.querySelector('.zhint'),cv=s.canvas;
   zb.onclick=()=>{s.drawing=!s.drawing;zb.textContent=s.drawing?'Abbrechen':'Zone zeichnen';zh.textContent=s.drawing?'Mit dem Finger ein Rechteck ins Bild ziehen':'';cv.style.touchAction=s.drawing?'none':'';cv.style.pointerEvents=s.drawing?'auto':'none'};
@@ -372,14 +483,14 @@ function makeTile(id,name,kind){
   cv.addEventListener('pointerdown',e=>{if(!s.drawing)return;st=pos(e);s.zone=[st[0],st[1],0,0];cv.setPointerCapture(e.pointerId)});
   cv.addEventListener('pointermove',e=>{if(!s.drawing||!st)return;const p=pos(e);s.zone=[Math.min(st[0],p[0]),Math.min(st[1],p[1]),Math.abs(p[0]-st[0]),Math.abs(p[1]-st[1])]});
   cv.addEventListener('pointerup',()=>{if(!s.drawing||!st)return;st=null;s.justDrew=true;setTimeout(()=>{s.justDrew=false},400);s.drawing=false;zb.textContent='Zone zeichnen';cv.style.pointerEvents='none';if(s.zone&&s.zone[2]>0.03&&s.zone[3]>0.03){zc.classList.remove('hide');zh.textContent='Zone aktiv: Alarm nur hier';addLog(s,'info','Zone festgelegt')}else{s.zone=null;zh.textContent='Zu klein, nochmal'}});
-  sources.set(id,s);updateEmpty();setTimeout(startAnalysis,400);return s;
+  sources.set(id,s);updateEmpty();if(kind==='local')setTimeout(startAnalysis,400);return s;
 }
 function addRemote(call,stream){
-  let s=sources.get(call.peer);
-  if(!s){s=makeTile(call.peer,(call.metadata&&call.metadata.name)||('Kamera '+(++srcCount)),'remote');s.call=call}
-  if(s.video.srcObject!==stream)s.video.srcObject=stream;
-  s.video.play().catch(()=>{});s.status.textContent='live';
-  if(!s.logged){s.logged=true;addLog(s,'info','Kamera verbunden: '+s.name)}
+  const s=sources.get(call.peer);if(!s||s.call!==call||s.mode==='jpeg')return;
+  const v=s.video;inlineVideo(v);if(v.srcObject!==stream)v.srcObject=stream;
+  s.status.textContent='Video empfangen · Bild wird geprüft';
+  v.play().catch(()=>showPlay(s));clearTimeout(s.frameTimer);trackRemoteFrames(s,call);
+  setNet('Kamera verbunden · Bild wird geprüft','warn');
 }
 async function addLocalCam(){
   if(sources.has('local'))return;
@@ -393,6 +504,7 @@ async function addLocalCam(){
 function dropSource(id,quiet){
   const s=sources.get(id);if(!s)return;
   if(s.logged&&!quiet)addLog(s,'info','Kamera getrennt: '+s.name);
+  clearTimeout(s.frameTimer);if(s.video.tagName==='VIDEO'){s.video.pause();s.video.srcObject=null}
   if(s.stream)s.stream.getTracks().forEach(t=>t.stop());
   if(spotSrc===s)unspot();s.slot.remove();sources.delete(id);updateEmpty();
 }
@@ -689,7 +801,7 @@ async function loop(){
 /* ---------- wiring ---------- */
 $('bControl').onclick=()=>startControl(false);
 $('bSingle').onclick=()=>startControl(true);
-$('bJoin').onclick=()=>{const c=$('joinCode').value.trim();if(c)startCameraDevice(c)};
+$('bJoin').onclick=()=>{const c=normalCode($('joinCode').value);if(c)startCameraDevice(c)};
 $('localCam').onclick=()=>addLocalCam();
 $('ctrlRetry').onclick=()=>{if(ctrlPeer&&ctrlPeer.open&&!ctrlPeer.disconnected){setNet('Bereit für Kameras','ok');return}openCtrlPeer(ctrlCode||rid())};
 $('fMotion').onchange=e=>feat.motion=e.target.checked;
@@ -714,9 +826,9 @@ $('fObj').onchange=e=>feat.obj=e.target.checked;
 $('fFace').onchange=e=>{feat.face=e.target.checked};
 $('wipeFaces').onclick=()=>{gallery.length=0;faceN=0;$('faces').innerHTML='<span class="mu sm">Gelöscht.</span>';sources.forEach(s=>s.faces=[])};
 $('stopAll').onclick=()=>{try{ctrlPeer&&ctrlPeer.destroy()}catch(e){}sources.forEach(s=>s.stream&&s.stream.getTracks().forEach(t=>t.stop()));sessionStorage.removeItem('sw_code');location.hash='';location.reload()};
-const m=location.hash.match(/join=([A-Za-z0-9]+)/);
-if(m){startCameraDevice(m[1])}
-window.__sw={sources,gallery,stats,models,logs,feat,refs,addRefPhoto,addObjPhoto,get strict(){return strict}};
+const join=new URLSearchParams(location.hash.slice(1)).get('join');
+if(join){startCameraDevice(join)}
+window.__sw={get camData(){return camData},get camPeer(){return camPeer},get camCall(){return camCall},normalCode,sources,gallery,stats,models,logs,feat,refs,addRefPhoto,addObjPhoto,get strict(){return strict}};
 })();
 </script>
 </body>
